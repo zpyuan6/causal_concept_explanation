@@ -4,6 +4,7 @@ import os
 import wandb
 import tqdm
 
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,8 +20,18 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     sum_loss = 0
     step_num = len(train_datasetloader)
 
+    num = 0
     with tqdm.tqdm(total= step_num) as tbar:
         for data, target in train_datasetloader:
+            if epoch==0 and num==0:
+                images = wandb.Image(
+                    data[0].squeeze(0),
+                    caption="Input sample"
+                )
+                wandb.log({"Input sample":images})
+
+                num+=1
+
             data, target = data.to(device), target.to(device)
             if data.shape[0] == 1:
                 continue
@@ -66,12 +77,20 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader):
     return avgloss, correct, acc
 
 def load_dataset(data_folder, input_size, batch_size):
-    transform=transforms.Compose([
+
+    train_transform=transforms.Compose([
+            transforms.Resize(input_size),
+            transforms.RandomHorizontalFlip(p=0.3),
+            transforms.RandomVerticalFlip(p=0.3),
+            transforms.ColorJitter(brightness=0.2,contrast=0.2,saturation=0.2,hue=0.2),
+            transforms.ToTensor()])
+
+    val_transform=transforms.Compose([
             transforms.Resize(input_size),
             transforms.ToTensor()])
 
-    train_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'train'), transform=transform)
-    val_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'val'), transform=transform)
+    train_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'train'), transform=train_transform)
+    val_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'val'), transform=val_transform)
 
     train_dataloader = data_utils.DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
     val_dataloader = data_utils.DataLoader(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
@@ -94,7 +113,13 @@ if __name__ == "__main__":
         project="causal_concept_explanation",
     )
 
-    models = ['vgg', 'resnet', 'mobilenet']
+    models = ['vgg','resnet', 'mobilenet']
+
+    sample_nums = [
+        22213/38,22213/2833,22213/3128,22213/72,22213/68,
+        22213/1590,22213/405,22213/397,22213/18,22213/38,
+        22213/811,22213/19,22213/5,22213/3,22213/8154,
+        22213/8,22213/3373,22213/13,22213/1846,22213/3]
 
     for model_name in models:
         print("Start {} model training".format(model_name))
@@ -106,6 +131,7 @@ if __name__ == "__main__":
             model.fc = nn.Linear(model.fc.in_features,20)
         elif model_name=='mobilenet':
             model = torchvision.models.mobilenet_v3_small(pretrained=True)
+            model.classifier[3] = nn.Linear(model.classifier[3].in_features,20)
         print(model)
         
 
@@ -118,7 +144,7 @@ if __name__ == "__main__":
 
         optimizer = optim.AdamW(model.parameters(), learn_rate)
 
-        loss_function = nn.CrossEntropyLoss()
+        loss_function = nn.CrossEntropyLoss(weight=torch.Tensor(sample_nums).to(device))
 
         for epoch in range(NUM_EPOCHES):
             train_loss = train_model(model, loss_function, optimizer, device, NUM_EPOCHES, epoch, train_dataloader)
@@ -133,6 +159,3 @@ if __name__ == "__main__":
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
-
-
-        break
