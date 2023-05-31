@@ -116,10 +116,10 @@ if __name__ == "__main__":
     models = ['vgg','resnet', 'mobilenet']
 
     sample_nums = [
-        22213/38,22213/2833,22213/3128,22213/72,22213/68,
-        22213/1590,22213/405,22213/397,22213/18,22213/38,
-        22213/811,22213/19,22213/5,22213/3,22213/8154,
-        22213/8,22213/3373,22213/13,22213/1846,22213/3]
+        36656/126,36656/3504,36656/4517,36656/73,36656/140,
+        36656/1590,36656/405,36656/397,36656/18,36656/110,
+        36656/839,36656/19,36656/5,36656/3,36656/8815,
+        36656/8,36656/3373,36656/43,36656/1909,36656/3]
 
     for model_name in models:
         print("Start {} model training".format(model_name))
@@ -134,7 +134,6 @@ if __name__ == "__main__":
             model.classifier[3] = nn.Linear(model.classifier[3].in_features,20)
         print(model)
         
-
         model.to(device)
 
         train_dataloader, val_dataloader = load_dataset(dataset_folder, input_size, batch_size)
