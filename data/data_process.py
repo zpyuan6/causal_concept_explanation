@@ -33,7 +33,9 @@ def copy_from_ade20k_to_opensurface():
                 for root, _, files in os.walk(os.path.join(r, folder)):
                     print(root, len(files))
                     for file in files:
-                        shutil.copy(os.path.join(root, file), os.path.join(target_val_folder,folder,file)) 
+                        key_list = file.split("_")
+                        if len(key_list)==3:
+                            shutil.copy(os.path.join(root, file), os.path.join(target_val_folder,folder,file)) 
 
 
 

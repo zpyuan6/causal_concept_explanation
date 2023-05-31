@@ -142,12 +142,14 @@ if __name__ == "__main__":
         early_stopping = EarlyStopping(patience=20, verbose=True, path=model_save_path)
 
         optimizer = optim.AdamW(model.parameters(), learn_rate)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
         loss_function = nn.CrossEntropyLoss(weight=torch.Tensor(sample_nums).to(device))
 
         for epoch in range(NUM_EPOCHES):
             train_loss = train_model(model, loss_function, optimizer, device, NUM_EPOCHES, epoch, train_dataloader)
             avgloss, correct, acc = val_model(model, device, loss_function, val_dataloader)
+            scheduler.step()
 
             early_stopping(avgloss, acc, model, train_loss)
             log = {f'training loss {model_name}': train_loss, 
