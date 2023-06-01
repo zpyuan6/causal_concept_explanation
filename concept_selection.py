@@ -4,23 +4,28 @@ import tqdm
 from train_auxiliary import load_concept_data, build_auxiliary_layer
 
 
-def val_model(model:torch.nn.Module, device, val_datasetloader):
+def val_model(model:torch.nn.Module, device, val_dataloader):
     model.eval()
 
     correct = 0
-    total_num = len(val_datasetloader.dataset)
+    total_num = len(val_dataloader.dataset)
+    concept_num = 1
     with torch.no_grad():
-        with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
-            for data, target in val_datasetloader:
+        with tqdm.tqdm(total = len(val_dataloader)) as pbar:
+            for data, target in val_dataloader:
                 data, target = data.to(device), target.to(device)
                 output = model(data)
                 _, pred = torch.max(output.data, 1)
                 correct += torch.sum(pred == target)
 
+                concept_num = output.shape[1]
+
                 pbar.update(1)
 
         correct = correct.data.item()
-        acc = correct / total_num
+        acc = correct / total_num /concept_num
+
+        print("concept_num",concept_num, acc)
 
         # print('\nVal set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         #     avgloss, correct, total_num, 100 * acc))
@@ -67,7 +72,7 @@ if __name__ == "__main__":
 
                 model.to(device)
 
-                correct, acc = val_model(model, device, val_datasetloader)
+                correct, acc = val_model(model, device, val_dataloader)
 
 
 

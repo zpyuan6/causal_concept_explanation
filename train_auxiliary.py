@@ -60,9 +60,14 @@ class DataPrefetcher():
 def build_auxiliary_layer(input_shape, concept_num, model_parameter_path=None):
 
     model = nn.Sequential(
+        nn.BatchNorm1d(input_shape),
         nn.Linear(input_shape,concept_num),
         nn.Sigmoid()
     )
+
+    for m in model.modules():
+        if isinstance(m, (nn.Conv2d, nn.Linear)):
+            nn.init.xavier_uniform_(m.weight)
 
     if model_parameter_path is not None:
         model.load_state_dict(torch.load(model_parameter_path))
@@ -127,7 +132,7 @@ def train_and_val_auxiliary_layer(learn_rate, num_epoches, model:torch.nn.Module
 if __name__ == "__main__":
 
     batch_size = 8
-    learn_rate=0.001
+    learn_rate=0.0001
     num_epoches=300
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_parameter_path = "model\\logs\\resnet.pt"
