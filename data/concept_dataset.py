@@ -16,7 +16,7 @@ OBJECT_INDEX = [0, 1, 2, 3, 6, 11, 12, 13, 14, 15, 17, 18, 20]
 
 CONCEPT_LEN  = [11, 35, 234, 584]
 class ConceptDataset(data.Dataset):
-    def __init__(self, model_name, layer_name, concept_type:str='color',train_or_val:str="train", input_path:str = "F:\\Broden\\concept_model\\feature_maps", annotation_path:str="F:\\Broden\\concept_model\\concept_annotation_processed") -> None:
+    def __init__(self, model_name, layer_name, device, concept_type:str='color',train_or_val:str="train", input_path:str = "F:\\Broden\\concept_model\\feature_maps", annotation_path:str="F:\\Broden\\concept_model\\concept_annotation_processed") -> None:
         
         self.concept_type = concept_type
 
@@ -34,6 +34,7 @@ class ConceptDataset(data.Dataset):
         annotation_path = os.path.join(annotation_path,train_or_val)
         self.annotation_list = []
         self.input_list = []
+        self.device = device
 
         for root, folders, files in os.walk(annotation_path):
             for file in files:
@@ -44,12 +45,12 @@ class ConceptDataset(data.Dataset):
                         annotation = torch.zeros(len(self.concept_indexs))
                         for concept_index in annotation_list:
                             annotation[self.concept_indexs.index(concept_index)] = 1
-
+                        annotation = annotation.to(self.device)
                         self.annotation_list.append(annotation)
                         self.input_list.append(os.path.join(input_path,f"{model_name}_{layer_name}",train_or_val,root.split("\\")[-2],file.split(".")[0]+".pt"))
 
     def __getitem__(self, index):
-        input_tensor = torch.load(self.input_list[index]).detach()
+        input_tensor = torch.load(self.input_list[index], map_location=self.device)
         input_tensor = torch.flatten(input_tensor)
 
         annotation = self.annotation_list[index]

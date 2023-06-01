@@ -39,15 +39,15 @@ def build_auxiliary_layer(input_shape, concept_num, model_parameter_path=None):
     return model
         
 
-def load_concept_data(model_name, layer_name, concept):
+def load_concept_data(model_name, layer_name, concept, device):
 
-    train_dataset =  ConceptDataset(model_name, layer_name, concept, train_or_val="train")
-    val_dataset =  ConceptDataset(model_name, layer_name, concept, train_or_val="val")
+    train_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="train")
+    val_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="val")
 
     print(f"training samples: {train_dataset.__len__()}, val samples: {val_dataset.__len__()} for concept {concept_type}, model {model_name}, layer {layer_name}")
 
-    train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
-    val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
+    train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = False, prefetch_factor=batch_size*2)
+    val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = False, prefetch_factor=batch_size*2)
 
     input_shape = train_dataset.__getitem__(0)[0].shape
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
                 save_path = os.path.join(save_folder,f"{model_name}_{layer_name}_{concept}.pt")
 
-                train_dataloader, val_dataloader, input_shape = load_concept_data(model_name, layer_name, concept)
+                train_dataloader, val_dataloader, input_shape = load_concept_data(model_name, layer_name, concept, device)
 
                 model = build_auxiliary_layer(input_shape[0], concept_num = len(train_dataloader.dataset.concept_indexs)) 
 
