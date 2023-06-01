@@ -13,7 +13,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 
-def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_num, epoch, train_datasetloader:data_utils.DataLoader):
+def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_num, epoch, train_datasetloader:data_utils.DataLoader, prefetcher = None):
     model.train()
     model.to(device=device)
 
@@ -22,53 +22,86 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
 
     # num = 0
     with tqdm.tqdm(total= step_num) as tbar:
-        for data, target in train_datasetloader:
-            # if epoch==0 and num==0:
-            #     images = wandb.Image(
-            #         data[0].squeeze(0),
-            #         caption="Input sample"
-            #     )
-            #     wandb.log({"Input sample":images})
+        if prefetcher is None:
+            for data, target in train_datasetloader:
+                # if epoch==0 and num==0:
+                #     images = wandb.Image(
+                #         data[0].squeeze(0),
+                #         caption="Input sample"
+                #     )
+                #     wandb.log({"Input sample":images})
 
-            #     num+=1
-            data, target = data.to(device), target.to(device)
+                #     num+=1
+                data, target = data.to(device), target.to(device)
 
-            # print("input and output", data.shape, target.shape)
+                # print("input and output", data.shape, target.shape)
 
-            if data.shape[0] == 1:
-                continue
-            output = model(data)
-            # print(output.shape, target.shape)
-            loss = loss_function(output, target)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            print_loss = loss.data.item()
-            sum_loss += print_loss
-            
-            tbar.set_description('Training Epoch: {}/{} Loss: {:.6f}'.format(epoch, epoch_num, loss.item()))
-            tbar.update(1)
+                if data.shape[0] == 1:
+                    continue
+                output = model(data)
+                # print(output.shape, target.shape)
+                loss = loss_function(output, target)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                print_loss = loss.data.item()
+                sum_loss += print_loss
+                
+                tbar.set_description('Training Epoch: {}/{} Loss: {:.6f}'.format(epoch, epoch_num, loss.item()))
+                tbar.update(1)
+        else:
+            data, target = prefetcher.next()
+            while data is not None:
+                if data.shape[0] == 1:
+                    continue
+                output = model(data)
+                # print(output.shape, target.shape)
+                loss = loss_function(output, target)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                print_loss = loss.data.item()
+                sum_loss += print_loss
+                
+                tbar.set_description('Training Epoch: {}/{} Loss: {:.6f}'.format(epoch, epoch_num, loss.item()))
+                tbar.update(1)
+
+                data, target = prefetcher.next()
+
     
     ave_loss = sum_loss / step_num
     return ave_loss
 
 
-def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader):
+def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, prefetcher = None):
     model.eval()
     test_loss = 0
     correct = 0
     total_num = len(val_datasetloader.dataset)
     with torch.no_grad():
         with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
-            for data, target in val_datasetloader:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                loss = loss_function(output, target)
-                _, pred = torch.max(output.data, 1)
-                correct += torch.sum(pred == target)
-                print_loss = loss.data.item()
-                test_loss += print_loss
-                pbar.update(1)
+            if prefetcher is None:
+                for data, target in val_datasetloader:
+                    data, target = data.to(device), target.to(device)
+                    output = model(data)
+                    loss = loss_function(output, target)
+                    _, pred = torch.max(output.data, 1)
+                    correct += torch.sum(pred == target)
+                    print_loss = loss.data.item()
+                    test_loss += print_loss
+                    pbar.update(1)
+            else:
+                data, target = prefetcher.next()
+                while data is not None:
+                    output = model(data)
+                    loss = loss_function(output, target)
+                    _, pred = torch.max(output.data, 1)
+                    correct += torch.sum(pred == target)
+                    print_loss = loss.data.item()
+                    test_loss += print_loss
+                    pbar.update(1)
+                    data, target = prefetcher.next()
+
 
         correct = correct.data.item()
         acc = correct / total_num

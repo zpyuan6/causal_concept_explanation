@@ -45,12 +45,12 @@ class ConceptDataset(data.Dataset):
                         annotation = torch.zeros(len(self.concept_indexs))
                         for concept_index in annotation_list:
                             annotation[self.concept_indexs.index(concept_index)] = 1
-                        annotation = annotation.to(self.device)
+
                         self.annotation_list.append(annotation)
                         self.input_list.append(os.path.join(input_path,f"{model_name}_{layer_name}",train_or_val,root.split("\\")[-2],file.split(".")[0]+".pt"))
 
     def __getitem__(self, index):
-        input_tensor = torch.load(self.input_list[index], map_location=self.device)
+        input_tensor = torch.load(self.input_list[index])
         input_tensor = torch.flatten(input_tensor)
 
         annotation = self.annotation_list[index]

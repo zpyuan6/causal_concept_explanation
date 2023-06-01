@@ -24,6 +24,38 @@ class DataLoaderX(DataLoader):
     def __iter__(self):
         return BackgroundGenerator(super().__iter__())
 
+class DataPrefetcher():
+    def __init__(self, loader):
+        self.loader = iter(loader)
+        self.stream = torch.cuda.Stream()
+        # With Amp, it isn't necessary to manually convert data to half.
+        # if args.fp16:
+        #     self.mean = self.mean.half()
+        #     self.std = self.std.half()
+        self.preload()
+
+    def preload(self):
+        try:
+            self.next_input, self.next_target = next(self.loader)
+        except StopIteration:
+            self.next_input = None
+            self.next_target = None
+            return
+        with torch.cuda.stream(self.stream):
+            self.next_input = self.next_input.cuda(non_blocking=True)
+            self.next_target = self.next_target.cuda(non_blocking=True)
+            # With Amp, it isn't necessary to manually convert data to half.
+            # if args.fp16:
+            #     self.next_input = self.next_input.half()
+            # else:
+
+    def next(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        input = self.next_input
+        target = self.next_target
+        self.preload()
+        return input, target
+
 
 def build_auxiliary_layer(input_shape, concept_num, model_parameter_path=None):
 
@@ -46,8 +78,8 @@ def load_concept_data(model_name, layer_name, concept, batch_size, device):
 
     print(f"training samples: {train_dataset.__len__()}, val samples: {val_dataset.__len__()} for concept {concept_type}, model {model_name}, layer {layer_name}")
 
-    train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = False, prefetch_factor=batch_size*2)
-    val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = False, prefetch_factor=batch_size*2)
+    train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=8, pin_memory = True, prefetch_factor=batch_size*2, persistent_workers=True)
+    val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=8, pin_memory = True, prefetch_factor=batch_size*2, persistent_workers=True)
 
     input_shape = train_dataset.__getitem__(0)[0].shape
 
@@ -67,8 +99,11 @@ def train_and_val_auxiliary_layer(learn_rate, num_epoches, model:torch.nn.Module
 
     best_acc=0
     for epoch in range(num_epoches):
-        train_loss = train_model(model, loss_function, optimizer, device, num_epoches, epoch, train_dataloader)
-        avgloss, _, acc = val_model(model, device, loss_function, val_dataloader)
+        train_prefetcher = DataPrefetcher(train_dataloader)
+        val_prefetcher = DataPrefetcher(val_dataloader)
+
+        train_loss = train_model(model, loss_function, optimizer, device, num_epoches, epoch, train_dataloader, train_prefetcher)
+        avgloss, _, acc = val_model(model, device, loss_function, val_dataloader, val_prefetcher)
         scheduler.step()
 
         early_stopping(avgloss, acc, model, train_loss)
