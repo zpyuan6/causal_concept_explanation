@@ -39,7 +39,7 @@ def build_auxiliary_layer(input_shape, concept_num, model_parameter_path=None):
     return model
         
 
-def load_concept_data(model_name, layer_name, concept, device):
+def load_concept_data(model_name, layer_name, concept, batch_size, device):
 
     train_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="train")
     val_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="val")
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
                 save_path = os.path.join(save_folder,f"{model_name}_{layer_name}_{concept}.pt")
 
-                train_dataloader, val_dataloader, input_shape = load_concept_data(model_name, layer_name, concept, device)
+                train_dataloader, val_dataloader, input_shape = load_concept_data(model_name, layer_name, concept, batch_size, device)
 
                 model = build_auxiliary_layer(input_shape[0], concept_num = len(train_dataloader.dataset.concept_indexs)) 
 
