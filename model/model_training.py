@@ -92,6 +92,9 @@ def load_dataset(data_folder, input_size, batch_size):
     train_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'train'), transform=train_transform)
     val_dataset = torchvision.datasets.ImageFolder(os.path.join(data_folder,'val'), transform=val_transform)
 
+    print(f"{train_dataset.classes}, {train_dataset.class_to_idx}")
+    print(f"{val_dataset.classes}, {val_dataset.class_to_idx}")
+
     train_dataloader = data_utils.DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
     val_dataloader = data_utils.DataLoader(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
 
@@ -116,22 +119,22 @@ if __name__ == "__main__":
     models = ['vgg','resnet', 'mobilenet']
 
     sample_nums = [
-        36656/126,36656/3504,36656/4517,36656/73,36656/140,
-        36656/1590,36656/405,36656/397,36656/18,36656/110,
-        36656/839,36656/19,36656/5,36656/3,36656/8815,
-        36656/8,36656/3373,36656/43,36656/1909,36656/3]
+        36656/3504,36656/4517,
+        36656/1590,
+        36656/839,36656/8815,
+        36656/3373,36656/1909]
 
     for model_name in models:
         print("Start {} model training".format(model_name))
 
-        model = torchvision.models.vgg11(pretrained=True) 
-        model.classifier[6] = nn.Linear(model.classifier[6].in_features,20)
+        model = torchvision.models.vgg16_bn(pretrained=True) 
+        model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
         if model_name=='resnet':
             model = torchvision.models.resnet18(pretrained=True)
-            model.fc = nn.Linear(model.fc.in_features,20)
+            model.fc = nn.Linear(model.fc.in_features,7)
         elif model_name=='mobilenet':
             model = torchvision.models.mobilenet_v3_small(pretrained=True)
-            model.classifier[3] = nn.Linear(model.classifier[3].in_features,20)
+            model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
         print(model)
         
         model.to(device)
@@ -146,6 +149,8 @@ if __name__ == "__main__":
 
         loss_function = nn.CrossEntropyLoss(weight=torch.Tensor(sample_nums).to(device))
 
+        best_acc = 0
+        
         for epoch in range(NUM_EPOCHES):
             train_loss = train_model(model, loss_function, optimizer, device, NUM_EPOCHES, epoch, train_dataloader)
             avgloss, correct, acc = val_model(model, device, loss_function, val_dataloader)
@@ -157,6 +162,11 @@ if __name__ == "__main__":
                 f'val acc {model_name}': acc, 
                 'epoch':epoch}
             wandb.log(log)
+
+            if acc > best_acc:
+                best_acc = acc
+                torch.save(model.state_dict(), f"{model_name}_best.pt")
+
             if early_stopping.early_stop:
                 print("Early stopping")
                 break

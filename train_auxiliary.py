@@ -13,6 +13,8 @@ import torch.utils.data as data_utils
 import torchvision
 import torchvision.transforms as transforms
 
+def append_auxiliary_linear_layers(model, model_name, num_concepts:int):
+    model
 
 def load_model(model_parameter_path, model_name):
     model = torchvision.models.vgg11(pretrained=True) 
@@ -26,7 +28,10 @@ def load_model(model_parameter_path, model_name):
     print(model)
 
     model.load_state_dict(torch.load(model_parameter_path))
-        
+
+    for param in model.named_parameters():
+        param[1].requires_grad = False
+
     return model
 
 def load_dataset(concept_type, batch_size):
@@ -45,8 +50,11 @@ def load_dataset(concept_type, batch_size):
     return train_dataloader, val_dataloader
 
 
-def train_and_val_auxiliary_layer(batch_size, learn_rate, num_epoches, concept_type, model):
-    load_dataset()
+def train_and_val_auxiliary_layer(batch_size, learn_rate, num_epoches, concept_type, model:torch.nn.Module):
+    train_dataloader, val_dataloader = load_dataset(concept_type, batch_size)
+
+    append_auxiliary_linear_layer(model)
+
 
 
 if __name__ == "__main__":
