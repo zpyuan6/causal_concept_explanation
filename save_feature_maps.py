@@ -18,6 +18,7 @@ class ModelHook():
         self.hooks = []
 
     def hook(self, module, input, output):
+        print(input)
         self.features.append(input[0].cpu().clone().detach())
 
     def register_hook(self,model:nn.Module,layer_name:str):
@@ -40,7 +41,9 @@ if __name__ == "__main__":
     model_parameter_path = f"model\\logs\\{model_name}_best.pt"
     model = load_model(model_name,model_parameter_path)
     model.to(device)
-    print(model)
+    print("-----------------------------------")
+    for name,param in model.named_parameters():
+        print("---", name)
 
     train_folder = "F:\\Broden\\opensurfaces\\train"
     val_folder = "F:\\Broden\\opensurfaces\\val"
@@ -52,12 +55,17 @@ if __name__ == "__main__":
         transforms.ToTensor()
     ])
 
-    layers_name_vgg = ["maxpool","layer1","layer2","layer3","layer4","fc"]
-    layers_name_resnet = ["maxpool","layer1","layer2","layer3","layer4","fc"]
-    layers_name_mobilenet = ["maxpool","layer1","layer2","layer3","layer4","fc"]
+    if model_name=="vgg":
+        layers_names = ["features.10","features.20","features.30","features.40","classifier"]
+    elif model_name=="resnet":
+        layers_names = ["maxpool","layer1","layer2","layer3","layer4","fc"]
+    elif model_name == "mobilenet":
+        layers_names = ["features.(3)","features.(6)","features.(9)","features.(12)","classifier"]
+    else:
+        raise Exception(f"Can not found modem {model_name}")
 
     hooks = ModelHook()
-    for name in layers_name_resnet:
+    for name in layers_names:
         hooks.register_hook(model, name)
 
     for root, folders, files in os.walk(train_folder):
@@ -72,7 +80,7 @@ if __name__ == "__main__":
             # print(torch.argmax(output,dim=1))
 
             for i, feature_map in enumerate(hooks.features):
-                np_path = os.path.join(save_path,f"{model_name}_{layers_name_resnet[i]}","train" ,root.split("\\")[-1])
+                np_path = os.path.join(save_path,f"{model_name}_{layers_names[i]}","train" ,root.split("\\")[-1])
                 if not os.path.exists(np_path):
                     os.makedirs(np_path) 
                 torch.save(feature_map, os.path.join(np_path,file.split(".")[0]+".pt")) 
@@ -92,7 +100,7 @@ if __name__ == "__main__":
             # print(torch.argmax(output,dim=1))
 
             for i, feature_map in enumerate(hooks.features):
-                np_path = os.path.join(save_path,f"{model_name}_{layers_name_resnet[i]}", "val", root.split("\\")[-1])
+                np_path = os.path.join(save_path,f"{model_name}_{layers_names[i]}", "val", root.split("\\")[-1])
                 if not os.path.exists(np_path):
                     os.makedirs(np_path) 
                 torch.save(feature_map, os.path.join(np_path,file.split(".")[0]+".pt")) 

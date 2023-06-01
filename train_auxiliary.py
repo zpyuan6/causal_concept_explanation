@@ -17,6 +17,14 @@ import torch.utils.data as data_utils
 import torchvision
 import torchvision.transforms as transforms
 
+from torch.utils.data import DataLoader
+from prefetch_generator import BackgroundGenerator
+
+class DataLoaderX(DataLoader):
+    def __iter__(self):
+        return BackgroundGenerator(super().__iter__())
+
+
 def build_auxiliary_layer(input_shape, concept_num, model_parameter_path=None):
 
     model = nn.Sequential(
@@ -38,8 +46,8 @@ def load_concept_data(model_name, layer_name, concept):
 
     print(f"training samples: {train_dataset.__len__()}, val samples: {val_dataset.__len__()} for concept {concept_type}, model {model_name}, layer {layer_name}")
 
-    train_dataloader = data_utils.DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
-    val_dataloader = data_utils.DataLoader(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
+    train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
+    val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
 
     input_shape = train_dataset.__getitem__(0)[0].shape
 
