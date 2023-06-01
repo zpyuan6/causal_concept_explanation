@@ -36,7 +36,7 @@ class EarlyStopping:
             self.save_checkpoint(val_loss, acc, model)
             if training_loss!=None:
                 self.training_loss = training_loss
-        elif score < self.best_score + self.delta:
+        elif score <= self.best_score + self.delta:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
             if self.counter >= self.patience:

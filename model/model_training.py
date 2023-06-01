@@ -78,6 +78,7 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
     test_loss = 0
     correct = 0
     total_num = len(val_datasetloader.dataset)
+    multi_target_num = 1
     with torch.no_grad():
         with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
             if prefetcher is None:
@@ -85,7 +86,11 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
                     data, target = data.to(device), target.to(device)
                     output = model(data)
                     loss = loss_function(output, target)
-                    _, pred = torch.max(output.data, 1)
+                    if output.shape == target.shape:
+                        pred = output
+                        multi_target_num = target.shape[-1]
+                    else:
+                        _, pred = torch.max(output.data, 1)
                     correct += torch.sum(pred == target)
                     print_loss = loss.data.item()
                     test_loss += print_loss
@@ -95,7 +100,11 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
                 while data is not None:
                     output = model(data)
                     loss = loss_function(output, target)
-                    _, pred = torch.max(output.data, 1)
+                    if output.shape == target.shape:
+                        pred = output
+                        multi_target_num = target.shape[-1]
+                    else:
+                        _, pred = torch.max(output.data, 1)
                     correct += torch.sum(pred == target)
                     print_loss = loss.data.item()
                     test_loss += print_loss
@@ -104,7 +113,7 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
 
 
         correct = correct.data.item()
-        acc = correct / total_num
+        acc = correct / total_num / multi_target_num
         avgloss = test_loss / len(val_datasetloader)
         # print('\nVal set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         #     avgloss, correct, total_num, 100 * acc))
