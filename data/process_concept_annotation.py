@@ -2,6 +2,7 @@ import os
 from skimage import io
 import numpy as np
 import json
+import shutil
 
 def get_item_list():
 
@@ -171,5 +172,52 @@ def get_concepts(dataset, input_file):
     return color_concept,material_concept,part_concept,object_concept
 
 
+def concept_annotation_reorganisation():
+    dataset_annotation_path = "F:\\Broden\\concept_model\\concept_annotation"
+
+    for root, folders, files in os.walk(dataset_annotation_path):
+        for file in files:
+            annotation = json.load(open(os.path.join(root,file), 'r'))
+
+            path_arr = root.split("\\")
+            path_arr[3] = "concept_annotation_processed"
+            dataset_annotation_save_path = "\\".join(path_arr)
+            color_folder = os.path.join(dataset_annotation_save_path, "color")
+            material_folder = os.path.join(dataset_annotation_save_path, "material")
+            part_folder = os.path.join(dataset_annotation_save_path, "part")
+            object_folder = os.path.join(dataset_annotation_save_path, "object")
+
+            if not os.path.exists(color_folder):
+                os.makedirs(color_folder)
+                os.makedirs(material_folder)
+                os.makedirs(part_folder)
+                os.makedirs(object_folder)
+            
+            if len(annotation["color_concept"])>0:
+                anno = json.dumps(annotation["color_concept"])
+                f = open(os.path.join(color_folder,file), 'w')
+                f.write(anno)
+                f.close()
+
+            if len(annotation["material_concept"])>0:
+                anno = json.dumps(annotation["material_concept"])
+                f = open(os.path.join(material_folder,file), 'w')
+                f.write(anno)
+                f.close()
+
+            if len(annotation["part_concept"])>0:
+                anno = json.dumps(annotation["part_concept"])
+                f = open(os.path.join(part_folder,file), 'w')
+                f.write(anno)
+                f.close()
+
+            if len(annotation["object_concept"])>0:
+                anno = json.dumps(annotation["object_concept"])
+                f = open(os.path.join(object_folder,file), 'w')
+                f.write(anno)
+                f.close()
+
+
 if __name__ == "__main__":
-    ade20k_list, opensurface_list = get_item_list()
+    # ade20k_list, opensurface_list = get_item_list()
+    concept_annotation_reorganisation()

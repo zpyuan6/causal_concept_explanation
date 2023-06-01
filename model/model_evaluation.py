@@ -3,6 +3,8 @@ import wandb
 import tqdm
 from PIL import Image
 
+from model.model_training import load_model
+
 import torchmetrics
 
 import torch
@@ -25,31 +27,13 @@ def load_dataset(data_folder):
 
     return val_dataloader
 
-def load_model(model_parameter_path, model_name):
-    model = torchvision.models.vgg11(pretrained=True) 
-    model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
-    if model_name=='resnet':
-        model = torchvision.models.resnet18(pretrained=True)
-        model.fc = nn.Linear(model.fc.in_features,7)
-    elif model_name=='mobilenet':
-        model = torchvision.models.mobilenet_v3_small(pretrained=True)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
-    print(model)
-
-    model.load_state_dict(torch.load(model_parameter_path))
-
-    for param in model.named_parameters():
-        param[1].requires_grad = False
-
-    return model
-
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_parameter_path = "model\\logs\\resnet.pt"
     model_name = "resnet"
 
-    model = load_model("model\\logs\\resnet.pt", "resnet")
-    # model = load_model("model\logs\mobilenet.pt", "mobilenet")
+    model = load_model("resnet", "model\\logs\\resnet.pt", )
+    # model = load_model("mobilenet", "model\logs\mobilenet.pt")
     model.to(device)
 
     val_folder = "F:\\Broden\\opensurfaces"

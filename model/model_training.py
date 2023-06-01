@@ -1,4 +1,4 @@
-from pytorchtools import EarlyStopping
+from model.pytorchtools import EarlyStopping
 
 import os
 import wandb
@@ -20,19 +20,21 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     sum_loss = 0
     step_num = len(train_datasetloader)
 
-    num = 0
+    # num = 0
     with tqdm.tqdm(total= step_num) as tbar:
         for data, target in train_datasetloader:
-            if epoch==0 and num==0:
-                images = wandb.Image(
-                    data[0].squeeze(0),
-                    caption="Input sample"
-                )
-                wandb.log({"Input sample":images})
+            # if epoch==0 and num==0:
+            #     images = wandb.Image(
+            #         data[0].squeeze(0),
+            #         caption="Input sample"
+            #     )
+            #     wandb.log({"Input sample":images})
 
-                num+=1
-
+            #     num+=1
             data, target = data.to(device), target.to(device)
+
+            # print("input and output", data.shape, target.shape)
+
             if data.shape[0] == 1:
                 continue
             output = model(data)
@@ -101,6 +103,25 @@ def load_dataset(data_folder, input_size, batch_size):
     return train_dataloader, val_dataloader
 
 
+def load_model(model_name, model_parameter_path=None):
+    if model_name=='vgg':
+        model = torchvision.models.vgg16_bn(pretrained=True) 
+        model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
+    elif model_name=='resnet':
+        model = torchvision.models.resnet18(pretrained=True)
+        model.fc = nn.Linear(model.fc.in_features,7)
+    elif model_name=='mobilenet':
+        model = torchvision.models.mobilenet_v3_small(pretrained=True)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
+    else:
+        raise Exception(f"Can not find model {model_name}")
+
+    if model_parameter_path is not None:
+        model.load_state_dict(torch.load(model_parameter_path))
+
+    print("Model Structure", model)
+    return model
+
 
 if __name__ == "__main__":
     
@@ -127,15 +148,7 @@ if __name__ == "__main__":
     for model_name in models:
         print("Start {} model training".format(model_name))
 
-        model = torchvision.models.vgg16_bn(pretrained=True) 
-        model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
-        if model_name=='resnet':
-            model = torchvision.models.resnet18(pretrained=True)
-            model.fc = nn.Linear(model.fc.in_features,7)
-        elif model_name=='mobilenet':
-            model = torchvision.models.mobilenet_v3_small(pretrained=True)
-            model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
-        print(model)
+        model = load_model(model_name)
         
         model.to(device)
 
