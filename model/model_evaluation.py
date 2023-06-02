@@ -3,8 +3,6 @@ import wandb
 import tqdm
 from PIL import Image
 
-from model.model_training import load_model
-
 import torchmetrics
 
 import torch
@@ -13,6 +11,25 @@ import torch.optim as optim
 import torch.utils.data as data_utils
 import torchvision
 import torchvision.transforms as transforms
+
+def load_model(model_name, model_parameter_path=None):
+    if model_name=='vgg':
+        model = torchvision.models.vgg16_bn(pretrained=True) 
+        model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
+    elif model_name=='resnet':
+        model = torchvision.models.resnet18(pretrained=True)
+        model.fc = nn.Linear(model.fc.in_features,7)
+    elif model_name=='mobilenet':
+        model = torchvision.models.mobilenet_v3_small(pretrained=True)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
+    else:
+        raise Exception(f"Can not find model {model_name}")
+
+    if model_parameter_path is not None:
+        model.load_state_dict(torch.load(model_parameter_path))
+
+    print("Model Structure", model)
+    return model
 
 def load_dataset(data_folder):
     val_transform=transforms.Compose([
@@ -29,11 +46,13 @@ def load_dataset(data_folder):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_parameter_path = "model\\logs\\resnet.pt"
-    model_name = "resnet"
+    model_name = "vgg"
+    model_parameter_path = f"model\\logs\\{model_name}_best.pt"
 
-    model = load_model("resnet", "model\\logs\\resnet.pt", )
+
+    model = load_model(model_name, model_parameter_path)
     # model = load_model("mobilenet", "model\logs\mobilenet.pt")
+    model.eval()
     model.to(device)
 
     val_folder = "F:\\Broden\\opensurfaces"
@@ -71,8 +90,8 @@ if __name__ == "__main__":
     total_precision = test_precision.compute()
     total_auc = test_auc.compute()
     print(f"torch metrics acc: {(100 * total_acc):>0.1f}%\n")
-    print("recall of every test dataset class: ", total_recall)
-    print("precision of every test dataset class: ", total_precision)
+    print("recall of every test dataset class: ", total_recall, torch.sum(total_recall)/7)
+    print("precision of every test dataset class: ", total_precision, torch.sum(total_precision)/7)
     print("auc:", total_auc.item())
 
     # 清空计算对象

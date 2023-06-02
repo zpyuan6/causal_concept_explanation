@@ -18,11 +18,14 @@ class ModelHook():
         self.hooks = []
 
     def hook(self, module, input, output):
-        print(input)
+        # print(input)
         self.features.append(input[0].cpu().clone().detach())
 
-    def register_hook(self,model:nn.Module,layer_name:str):
-        hook = model._modules[layer_name].register_forward_hook(self.hook)
+    def register_hook(self,model:nn.Module,layer_name:str, module:nn.Module=None):
+        if module ==None:
+            hook = model._modules[layer_name].register_forward_hook(self.hook)
+        else:
+            hook = module.register_forward_hook(self.hook)
         self.hooks.append(hook)
 
     def remove_hook(self):
@@ -36,14 +39,11 @@ class ModelHook():
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = "resnet"
+    model_name = "vgg"
 
     model_parameter_path = f"model\\logs\\{model_name}_best.pt"
     model = load_model(model_name,model_parameter_path)
     model.to(device)
-    print("-----------------------------------")
-    for name,param in model.named_parameters():
-        print("---", name)
 
     train_folder = "F:\\Broden\\opensurfaces\\train"
     val_folder = "F:\\Broden\\opensurfaces\\val"
@@ -55,18 +55,25 @@ if __name__ == "__main__":
         transforms.ToTensor()
     ])
 
+    hooks = ModelHook()
+
     if model_name=="vgg":
         layers_names = ["features.10","features.20","features.30","features.40","classifier"]
+        for name,module in model.named_modules():
+            if name in layers_names:
+                hooks.register_hook(model, name,module)
     elif model_name=="resnet":
         layers_names = ["maxpool","layer1","layer2","layer3","layer4","fc"]
+        for name in layers_names:
+            hooks.register_hook(model, name)
     elif model_name == "mobilenet":
-        layers_names = ["features.(3)","features.(6)","features.(9)","features.(12)","classifier"]
+        layers_names = ["features.3","features.6","features.9","features.12","classifier"]
+        for name,module in model.named_modules():
+            if name in layers_names:
+                hooks.register_hook(model, name,module)
+
     else:
         raise Exception(f"Can not found modem {model_name}")
-
-    hooks = ModelHook()
-    for name in layers_names:
-        hooks.register_hook(model, name)
 
     for root, folders, files in os.walk(train_folder):
         print(root, "is processing.")

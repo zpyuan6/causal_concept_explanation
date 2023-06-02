@@ -155,6 +155,9 @@ def load_model(model_name, model_parameter_path=None):
     elif model_name=='mobilenet':
         model = torchvision.models.mobilenet_v3_small(pretrained=True)
         model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
+    elif model_name=="densenet":
+        model = torchvision.models.densenet121(pretrained=True)
+        model.classifier = nn.Linear(model.classifier.in_features,7)
     else:
         raise Exception(f"Can not find model {model_name}")
 
@@ -179,7 +182,8 @@ if __name__ == "__main__":
         project="causal_concept_explanation",
     )
 
-    models = ['vgg','resnet', 'mobilenet']
+    # models = ['vgg','resnet', 'mobilenet']
+    models = ['densenet']
 
     sample_nums = [
         36656/3504,36656/4517,
