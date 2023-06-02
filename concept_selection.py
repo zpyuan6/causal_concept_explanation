@@ -8,8 +8,7 @@ from train_auxiliary import load_concept_data, build_auxiliary_layer
 def val_model(model:torch.nn.Module, device, val_dataloader, concept_num, loss_function):
     model.eval()
 
-    test_recall = torchmetrics.Recall(average='none', num_classes=7).to(device)
-    test_precision = torchmetrics.Precision(average='none', num_classes=7).to(device)
+
 
     total_loss = torch.zeros(concept_num)
     sample_num = torch.zeros(concept_num)
@@ -27,18 +26,22 @@ def val_model(model:torch.nn.Module, device, val_dataloader, concept_num, loss_f
                     total_loss[i] += loss.data.cpu()
 
                 sample_num = sample_num + output.shape[0]
+                
+                T_Sample = (output.ge(0.5)==target).cpu()
+                acc_num = acc_num + torch.sum(T_Sample,0).cpu()
+                
+                F_Sample = (output.ge(0.5)!=target).cpu()
 
-                acc_num = acc_num + torch.sum(output.ge(0.5)==target,0).cpu()
-                test_recall(output, target)
-                test_precision(output, target)
+                TP += torch.sum(T_Sample*target ,0).cpu()
+                FP += torch.sum(F_Sample*target ,0).cpu()
+                TN += torch.sum(T_Sample*(~target) ,0).cpu()
+                FN += torch.sum(F_Sample*(~target) ,0).cpu()
 
                 pbar.update(1)
 
-
-        total_recall = test_recall.compute()
-        total_precision = test_precision.compute()
-
-        print(f"torch metrics acc: {acc_num/sample_num}")
+        total_acc, total_recall, total_precision = acc_num/sample_num, TP/(TP+FN), TP/(TP+FP)
+        print(f"torch metrics acc: {total_acc}")
+        print(f"torch metrics acc: {(TP+TN)/(TP+FP+TN+FN)}")
         print("recall of every test dataset class: ", total_recall)
         print("precision of every test dataset class: ", total_precision)
 
@@ -47,7 +50,7 @@ def val_model(model:torch.nn.Module, device, val_dataloader, concept_num, loss_f
         # print('\nVal set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         #     avgloss, correct, total_num, 100 * acc))
     
-    return total_acc, total_recall, total_precision, total_loss
+    return total_acc, total_recall, total_precision, total_loss, TP,FP,TN,FN, sample_num
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -94,9 +97,9 @@ if __name__ == "__main__":
 
                 model.to(device)
 
-                total_acc, total_recall, total_precision, total_loss = val_model(model, device, val_dataloader, len(val_dataloader.dataset.concept_indexs), loss_function)
+                total_acc, total_recall, total_precision, total_loss, TP,FP,TN,FN, sample_num = val_model(model, device, val_dataloader, len(val_dataloader.dataset.concept_indexs), loss_function)
 
-                print(f"{concept}_{layer_name}_{model_name} total_acc {total_acc}, total_loss {total_loss}, total_recall {total_recall}, total_precision {total_precision}", file=log_file)
+                print(f"{concept}_{layer_name}_{model_name} total_acc {total_acc}, total_loss {total_loss}, total_recall {total_recall}, total_precision {total_precision}, TP {TP}, FP {FP}, TN {TN}, FN {FN}, sample num {sample_num}", file=log_file)
 
 
 
