@@ -81,7 +81,7 @@ def load_concept_data(model_name, layer_name, concept, batch_size, device):
     train_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="train")
     val_dataset =  ConceptDataset(model_name, layer_name, device, concept, train_or_val="val")
 
-    print(f"training samples: {train_dataset.__len__()}, val samples: {val_dataset.__len__()} for concept {concept_type}, model {model_name}, layer {layer_name}")
+    print(f"training samples: {train_dataset.__len__()}, val samples: {val_dataset.__len__()} for concept {concept}, model {model_name}, layer {layer_name}")
 
     train_dataloader = DataLoaderX(train_dataset, shuffle=True, batch_size=batch_size, num_workers=8, pin_memory = True, prefetch_factor=batch_size*2, persistent_workers=True)
     val_dataloader = DataLoaderX(val_dataset, shuffle=False, batch_size=batch_size, num_workers=8, pin_memory = True, prefetch_factor=batch_size*2, persistent_workers=True)
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     models_layers = {
         'vgg': [],
         'resnet': ["maxpool","layer1","layer2","layer3","layer4","fc"], 
-        'mobilenet': []
+        'mobilenet': ["features.3","features.6","features.9","features.12","classifier"]
         }
 
     concept_list = ["color", "material" , "part", "object" ]

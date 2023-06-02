@@ -89,9 +89,10 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
                     if output.shape == target.shape:
                         pred = output
                         multi_target_num = target.shape[-1]
+                        correct += torch.sum(pred.ge(0.5) == target)
                     else:
                         _, pred = torch.max(output.data, 1)
-                    correct += torch.sum(pred == target)
+                        correct += torch.sum(pred == target)
                     print_loss = loss.data.item()
                     test_loss += print_loss
                     pbar.update(1)
@@ -103,9 +104,10 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
                     if output.shape == target.shape:
                         pred = output
                         multi_target_num = target.shape[-1]
+                        correct += torch.sum(pred.ge(0.5) == target)
                     else:
                         _, pred = torch.max(output.data, 1)
-                    correct += torch.sum(pred == target)
+                        correct += torch.sum(pred == target)
                     print_loss = loss.data.item()
                     test_loss += print_loss
                     pbar.update(1)
