@@ -32,10 +32,10 @@ def val_model(model:torch.nn.Module, device, val_dataloader, concept_num, loss_f
                 
                 F_Sample = (output.ge(0.5)!=target).cpu()
 
-                TP += torch.sum(T_Sample*target ,0).cpu()
-                FP += torch.sum(F_Sample*target ,0).cpu()
-                TN += torch.sum(T_Sample*(~target) ,0).cpu()
-                FN += torch.sum(F_Sample*(~target) ,0).cpu()
+                TP += torch.sum(T_Sample*target.cpu() ,0).cpu()
+                FP += torch.sum(F_Sample*target.cpu() ,0).cpu()
+                TN += torch.sum(T_Sample*(~(target==1).cpu()) ,0).cpu()
+                FN += torch.sum(F_Sample*(~(target==1).cpu()) ,0).cpu()
 
                 pbar.update(1)
 
@@ -55,16 +55,18 @@ def val_model(model:torch.nn.Module, device, val_dataloader, concept_num, loss_f
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     batch_size = 8
-    models = ['resnet','mobilenet']
+    # models = ['resnet','mobilenet']
+    models = ['densenet']
 
     models_layers = {
+        'densenet': ["features.denseblock1", "features.denseblock2","features.denseblock3","features.denseblock4","classifier"],
         'resnet': ["maxpool","layer1","layer2","layer3","layer4","fc"], 
         'mobilenet': ["features.3","features.6","features.9","features.12","classifier"]
         }
 
     concept_list = ["color", "material" , "part", "object" ]
 
-    concept_models_path = "concept_models"
+    concept_models_path = "concept_models\\densenet"
 
     concept_models_list = []
 

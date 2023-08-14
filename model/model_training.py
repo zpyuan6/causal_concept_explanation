@@ -3,7 +3,8 @@ from model.pytorchtools import EarlyStopping
 import os
 import wandb
 import tqdm
-
+import matplotlib.pyplot as plt
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -20,7 +21,8 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     sum_loss = 0
     step_num = len(train_datasetloader)
 
-    # num = 0
+    total_num = len(train_datasetloader.dataset)
+    correct = 0
     with tqdm.tqdm(total= step_num) as tbar:
         if prefetcher is None:
             for data, target in train_datasetloader:
@@ -34,6 +36,11 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
                 #     num+=1
                 data, target = data.to(device), target.to(device)
 
+                # print(target[0])
+                # img = np.transpose(np.squeeze(data[0].cpu().numpy()),(1,2,0))
+                # plt.imshow(img)
+                # plt.show()
+
                 # print("input and output", data.shape, target.shape)
 
                 if data.shape[0] == 1:
@@ -41,6 +48,15 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
                 output = model(data)
                 # print(output.shape, target.shape)
                 loss = loss_function(output, target)
+
+                if output.shape == target.shape:
+                    pred = output
+                    multi_target_num = target.shape[-1]
+                    correct += torch.sum(pred.ge(0.5) == target)
+                else:
+                    _, pred = torch.max(output.data, 1)
+                    correct += torch.sum(pred == target)
+
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -68,9 +84,12 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
 
                 data, target = prefetcher.next()
 
+
+    correct = correct.data.item()
+    acc = correct / total_num 
     
     ave_loss = sum_loss / step_num
-    return ave_loss
+    return ave_loss, acc
 
 
 def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, prefetcher = None):
@@ -84,6 +103,12 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
             if prefetcher is None:
                 for data, target in val_datasetloader:
                     data, target = data.to(device), target.to(device)
+
+                    # print(target[0], torch.max(data[0]), torch.min(data[0]))
+                    # img = np.transpose(np.squeeze(data[0].cpu().numpy()),(1,2,0))
+                    # plt.imshow(img)
+                    # plt.show()
+
                     output = model(data)
                     loss = loss_function(output, target)
                     if output.shape == target.shape:
@@ -147,19 +172,21 @@ def load_dataset(data_folder, input_size, batch_size):
     return train_dataloader, val_dataloader
 
 
-def load_model(model_name, model_parameter_path=None):
+def load_model(model_name, model_parameter_path=None, num_class=None, input_channels=None):
+    num_class = 7 if num_class==None else num_class
+    input_channels = 3 if input_channels==None else input_channels
     if model_name=='vgg':
         model = torchvision.models.vgg16_bn(pretrained=True) 
-        model.classifier[6] = nn.Linear(model.classifier[6].in_features,7)
+        model.classifier[6] = nn.Linear(model.classifier[6].in_features,num_class)
     elif model_name=='resnet':
         model = torchvision.models.resnet18(pretrained=True)
-        model.fc = nn.Linear(model.fc.in_features,7)
+        model.fc = nn.Linear(model.fc.in_features,num_class)
     elif model_name=='mobilenet':
         model = torchvision.models.mobilenet_v3_small(pretrained=True)
-        model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features,num_class)
     elif model_name=="densenet":
         model = torchvision.models.densenet121(pretrained=True)
-        model.classifier = nn.Linear(model.classifier.in_features,7)
+        model.classifier = nn.Linear(model.classifier.in_features,num_class)
     else:
         raise Exception(f"Can not find model {model_name}")
 

@@ -39,7 +39,7 @@ class ModelHook():
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = "vgg"
+    model_name = "densenet"
 
     model_parameter_path = f"model\\logs\\{model_name}_best.pt"
     model = load_model(model_name,model_parameter_path)
@@ -71,7 +71,12 @@ if __name__ == "__main__":
         for name,module in model.named_modules():
             if name in layers_names:
                 hooks.register_hook(model, name,module)
-
+    elif model_name=="densenet":
+        layers_names = ["features.denseblock1", "features.denseblock2","features.denseblock3","features.denseblock4","classifier"]
+        for name,module in model.named_modules():
+            if name in layers_names:
+                print("-----",name)
+                hooks.register_hook(model, name,module)
     else:
         raise Exception(f"Can not found modem {model_name}")
 

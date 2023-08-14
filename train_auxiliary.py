@@ -100,7 +100,7 @@ def train_and_val_auxiliary_layer(learn_rate, num_epoches, model:torch.nn.Module
     loss_function = nn.BCELoss()
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
 
-    early_stopping = EarlyStopping(patience=20, verbose=True, path=os.path.join(save_folder,model_name))
+    early_stopping = EarlyStopping(patience=20, verbose=True, path=os.path.join(save_folder,model_name+".pt"))
 
     best_acc=0
     for epoch in range(num_epoches):
@@ -120,7 +120,7 @@ def train_and_val_auxiliary_layer(learn_rate, num_epoches, model:torch.nn.Module
 
         if acc > best_acc:
             best_acc = acc
-            torch.save(model.state_dict(),  os.path.join(save_folder,model_name.split(".")[0]+"_best.pt"))
+            torch.save(model.state_dict(),  os.path.join(save_folder,model_name+"_best.pt"))
 
         if early_stopping.early_stop:
             print("Early stopping")
@@ -135,9 +135,7 @@ if __name__ == "__main__":
     learn_rate=0.0001
     num_epoches=300
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_parameter_path = "model\\logs\\resnet.pt"
-    concept_type = "color"
-    save_folder = "concept_models"
+    save_folder = "concept_models\\densenet"
 
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
@@ -148,11 +146,11 @@ if __name__ == "__main__":
         name=f"{socket.gethostname()}_{time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime())}"
     )
 
-    # models = ['vgg','resnet', 'mobilenet']
-    models = ['resnet']
+    # models = ['densenet', 'resnet', 'mobilenet']
+    models = ['densenet']
 
     models_layers = {
-        'vgg': [],
+        'densenet': ["features.denseblock1", "features.denseblock2","features.denseblock3","features.denseblock4","classifier"],
         'resnet': ["maxpool","layer1","layer2","layer3","layer4","fc"], 
         'mobilenet': ["features.3","features.6","features.9","features.12","classifier"]
         }
@@ -166,12 +164,10 @@ if __name__ == "__main__":
 
             for layer_name in models_layers[model_name]:
 
-                save_path = os.path.join(save_folder,f"{model_name}_{layer_name}_{concept}.pt")
-
                 train_dataloader, val_dataloader, input_shape = load_concept_data(model_name, layer_name, concept, batch_size, device)
 
                 model = build_auxiliary_layer(input_shape[0], concept_num = len(train_dataloader.dataset.concept_indexs)) 
 
-                train_and_val_auxiliary_layer(learn_rate, num_epoches, model, device, train_dataloader, val_dataloader, model_name=f"{concept}_{layer_name}_{model_name}.pt", save_folder=save_folder)
+                train_and_val_auxiliary_layer(learn_rate, num_epoches, model, device, train_dataloader, val_dataloader, model_name=f"{concept}_{layer_name}_{model_name}", save_folder=save_folder)
 
             

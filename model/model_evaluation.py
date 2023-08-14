@@ -22,6 +22,9 @@ def load_model(model_name, model_parameter_path=None):
     elif model_name=='mobilenet':
         model = torchvision.models.mobilenet_v3_small(pretrained=True)
         model.classifier[3] = nn.Linear(model.classifier[3].in_features,7)
+    elif model_name=="densenet":
+        model = torchvision.models.densenet121(pretrained=False)
+        model.classifier = nn.Linear(model.classifier.in_features,7)
     else:
         raise Exception(f"Can not find model {model_name}")
 
@@ -46,7 +49,7 @@ def load_dataset(data_folder):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = "vgg"
+    model_name = "densenet"
     model_parameter_path = f"model\\logs\\{model_name}_best.pt"
 
 

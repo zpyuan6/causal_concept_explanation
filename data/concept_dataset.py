@@ -16,7 +16,7 @@ OBJECT_INDEX = [0, 1, 2, 3, 6, 11, 12, 13, 14, 15, 17, 18, 20]
 
 CONCEPT_LEN  = [11, 35, 234, 584]
 class ConceptDataset(data.Dataset):
-    def __init__(self, model_name, layer_name, device, concept_type:str='color',train_or_val:str="train", input_path:str = "F:\\Broden\\concept_model\\feature_maps", annotation_path:str="F:\\Broden\\concept_model\\concept_annotation_processed") -> None:
+    def __init__(self, model_name, layer_name, device, concept_type:str='color',train_or_val:str="train", input_path:str = "G:\\feature_maps", annotation_path:str="F:\\Broden\\concept_model\\concept_annotation_processed") -> None:
         
         self.concept_type = concept_type
 
