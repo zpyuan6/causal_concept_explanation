@@ -12,6 +12,12 @@
 
 ## How to start
 
+```
+conda create -n causal_concept python==3.6.13
+conda activate causal_concept
+pip install -r requirements.txt
+```
+
 ### PVR tasks
 
 1. Dataset Generation for PVR
@@ -31,3 +37,16 @@ In this stage, PVR Concept Datasets are generated.
 ```
 python data\pvr_concepts_dataset_generation.py
 ```
+
+4. Concept Identification
+In this stage, concept is identified.
+```
+python concept_representation_identification.py
+```
+
+
+## Related Works
+Thanks for the contributions from the below repos.
+- CAV (https://github.com/rakhimovv/tcav)
+- Concept based decision tree explanations (https://github.com/DataSystemsGroupUT/ACDTE/tree/master)
+- ConceptSHAP (https://github.com/chihkuanyeh/concept_exp; https://github.com/arnav-gudibande/conceptSHAP)

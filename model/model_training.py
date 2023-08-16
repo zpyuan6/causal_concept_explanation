@@ -172,9 +172,8 @@ def load_dataset(data_folder, input_size, batch_size):
     return train_dataloader, val_dataloader
 
 
-def load_model(model_name, model_parameter_path=None, num_class=None, input_channels=None):
+def load_model(model_name, model_parameter_path=None, num_class=None):
     num_class = 7 if num_class==None else num_class
-    input_channels = 3 if input_channels==None else input_channels
     if model_name=='vgg':
         model = torchvision.models.vgg16_bn(pretrained=True) 
         model.classifier[6] = nn.Linear(model.classifier[6].in_features,num_class)

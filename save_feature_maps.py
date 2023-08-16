@@ -115,7 +115,7 @@ if __name__ == "__main__":
                 np_path = os.path.join(save_path,f"{model_name}_{layers_names[i]}", "val", root.split("\\")[-1])
                 if not os.path.exists(np_path):
                     os.makedirs(np_path) 
-                torch.save(feature_map, os.path.join(np_path,file.split(".")[0]+".pt")) 
+                torch.save(feature_map, os.path.join(np_path,file.split(".")[0]+".pt"))
 
             hooks.clean_features()
 
