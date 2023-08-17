@@ -222,16 +222,129 @@ class ConceptSHAP(object):
         else:
             print('save_path is None. Not saving anything')
 
+class SimplifiedConceptModel(nn.Module):
+    def __init__(self, n_concepts, train_embeddings, original_model:nn.Module, bottleneck:str, example_input_for_original_model:torch.tensor, device:torch.device):
+        super(SimplifiedConceptModel, self).__init__()
+        embedding_dim = train_embeddings.view(train_embeddings.shape[0],-1).shape[1]
+        # random init using uniform dist
+        self.concept = nn.Parameter(self.init_concept(embedding_dim, n_concepts), requires_grad=True)
+        self.n_concepts = n_concepts
+        self.train_embeddings = train_embeddings.transpose(0, 1) # (dim, all_data_size)
+
+        self.original_model = original_model.eval().to(device)
+        self.bottleneck = bottleneck
+        self.add_hook()
+        self.original_model_input_sample = torch.unsqueeze(example_input_for_original_model, dim=0).to(device)
+        self.modified_feature_map = None
+        self.device = device
+
+    def init_concept(self, embedding_dim, n_concepts):
+        r_1 = -0.5
+        r_2 = 0.5
+        concept = (r_2 - r_1) * torch.rand(embedding_dim, n_concepts) + r_1
+        return concept
+
+    def forward_hook(self, module, input, output):
+        return self.modified_feature_map
+
+    def forward(self, train_embedding):
+        origninal_embedding = train_embedding
+        train_embedding = torch.reshape(train_embedding,(train_embedding.shape[0],-1)).to(self.device)
+        concept_pred = train_embedding @ self.concept
+
+        # calculating projection of train_embedding onto the concept vector space
+
+        a = self.concept @ torch.inverse((self.concept.T @ self.concept))
+        proj = a @ (self.concept.T @ train_embedding.T) # (embedding_dim x embedding_dim) (embedding_dim x batch_size)
+
+        # passing projected activations through rest of model
+        self.modified_feature_map = torch.reshape(proj.T, origninal_embedding.shape) 
+        y_pred = self.original_model(self.original_model_input_sample)
+        self.modified_feature_map = origninal_embedding
+        orig_pred = self.original_model(self.original_model_input_sample)
+        orig_pred = torch.argmax(orig_pred, dim=1)
+
+        # print(concept_pred.shape, orig_pred.shape)
+        return concept_pred, y_pred, orig_pred
+
+    def add_hook(self):
+        for name,module in self.original_model.named_modules():
+             if name == self.bottleneck:
+                self.hook = module.register_forward_hook(self.forward_hook)
+                break
+
+    def remove_hook(self):
+        self.hook.remove()
+
+
 
 class SimplifiedConceptSHAP(object):
-    def __init__(self, n_concepts:int, input_exmaple:torch.tensor, original_model:nn.modules, bottleneck:str) -> None:
+    def __init__(self, n_concepts, train_embeddings, original_model:nn.Module, bottleneck:str, example_input_for_original_model:torch.tensor, save_path, concept):
+        super(SimplifiedConceptSHAP, self).__init__()
+        # random init using uniform dist
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.concept_model = SimplifiedConceptModel(n_concepts, train_embeddings, original_model, bottleneck, example_input_for_original_model, self.device)
+        self.ce_loss = nn.CrossEntropyLoss()
+        self.save_path = save_path
+        self.batch_size = 5
+        self.num_epoch = 5
+        self.optimizer = torch.optim.Adam(self.concept_model.parameters(),lr=1e-3)
+        self.concept = concept
+        
+
+    def loss(self, train_embedding, concept_true):
+        concept_pred, y_pred, orig_pred = self.concept_model(train_embedding)
+        loss_new = self.ce_loss(concept_pred, concept_true) + self.ce_loss(y_pred, orig_pred)
+
+        return loss_new
 
 
     def train(self, x, y):
+        dataset = FeatureMapsDataset(x,y)
+        train_dataset,val_dataset = random_split(dataset, [int(len(dataset)*0.8),len(dataset)-int(len(dataset)*0.8)])
+        train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=self.batch_size, num_workers=6, pin_memory = True, prefetch_factor=self.batch_size*2)
+        val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size, num_workers=6, pin_memory = True, prefetch_factor=self.batch_size*2)
 
+        self.concept_model = self.concept_model.to(self.device)
+        for epoch_index in range(self.num_epoch):
+            with tqdm(total=len(train_dataloader)) as tbar:
+                for train_embeddings_narrow, train_concept_true_narrow in train_dataloader:
+                    train_embeddings_narrow = train_embeddings_narrow.to(self.device)
+                    train_concept_true_narrow = train_concept_true_narrow.to(self.device)
+                    final_loss = self.loss(train_embeddings_narrow, train_concept_true_narrow)
 
-    def save_model(self, concepts, save_path):
+                    self.optimizer.zero_grad()
+                    final_loss.backward()
+                    self.optimizer.step()
+                    tbar.update(1)
 
+        correct_num = 0
+        number_samples = len(val_dataloader.dataset)
+        with tqdm(total=len(val_dataloader)) as tbar:
+            for val_embeddings_narrow, val_y_true_narrow in val_dataloader:
+                val_embeddings_narrow = val_embeddings_narrow.to(self.device)
+                val_y_true_narrow = val_y_true_narrow.to(self.device)
+                concept_pred, y_pred, orig_pred = self.concept_model(val_embeddings_narrow)
+                
+                correct_num += torch.eq(torch.argmax(concept_pred,dim=1),val_y_true_narrow).sum().float().cpu().item()
+                tbar.update(1)
+        
+        self.acc = correct_num/number_samples
+        print(f"Acc {self.acc}")
+        self.save_model()
+        self.concept_model.remove_hook()
+
+    def save_model(self):
+        save_dict = {
+            'concepts': self.concept,
+            'accuracies': self.acc,
+            'saved_path': self.save_path
+        }
+        if self.save_path is not None:
+            with open(self.save_path, 'wb') as pkl_file:
+                pickle.dump(save_dict, pkl_file)
+        else:
+            print('save_path is None. Not saving anything')
         
         
 

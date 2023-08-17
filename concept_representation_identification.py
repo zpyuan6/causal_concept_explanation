@@ -3,7 +3,7 @@ from model.model_training import load_model
 from save_feature_maps import ModelHook
 from concept_explanation.CAV import CAV
 from concept_explanation.Tree_Based_CAV import TREECAV
-from concept_explanation.ConceptSHAP import ConceptSHAP
+from concept_explanation.ConceptSHAP import SimplifiedConceptSHAP
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ import os
 import tqdm
 import numpy as np
 import copy
+import pickle
 
 def load_dataset(dataset_path, dataset_name, concept_name, num_samples, batch_size):
     
@@ -46,6 +47,8 @@ if __name__ == "__main__":
 
     MODEL_NAMES= ['vgg','resnet','mobilenet','densenet']
 
+    is_load_saved_data = False
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     hooks = ModelHook()
@@ -55,7 +58,6 @@ if __name__ == "__main__":
             model_path = f"model\pvr_models\{model_name}_{dataset_name}_best.pt"
             model = load_model(model_name, model_path, 10)
            
-
             if model_name=="vgg":
                 layers_names = ["features.10","features.20","features.30","features.40","classifier"]
                 for name,module in model.named_modules():
@@ -74,12 +76,12 @@ if __name__ == "__main__":
                 layers_names = ["features.denseblock1", "features.denseblock2","features.denseblock3","features.denseblock4","classifier"]
                 for name,module in model.named_modules():
                     if name in layers_names:
-                        print("-----",name)
                         hooks.register_hook(model, name,module)
             else:
                 raise Exception(f"Can not found modem {model_name}")
 
             model.to(device)
+            model.eval()
             for concept_name in CONCEPT_LIST:
                 for num_samples in NUM_SAMPLE_LIST:
                     train_dataloader, val_dataloader= load_dataset(dataset_path, dataset_name, concept_name, num_samples, batch_size)
@@ -87,44 +89,61 @@ if __name__ == "__main__":
                     feature_maps = {}
                     labels = None
                     
-                    with tqdm.tqdm(total=len(train_dataloader)) as tbar:
-                        for input, label in train_dataloader:
-                            input = input.to(device)
-                            output = model(input)
-                            labels = label if labels == None else torch.cat((labels, label))
-
-                            for i, feature_map in enumerate(hooks.features):
-                                if layers_names[i] in feature_maps:
-                                    feature_maps[layers_names[i]] = torch.cat((feature_maps[layers_names[i]],feature_map), dim=0)
-                                else:
-                                    feature_maps[layers_names[i]] = feature_map
-
+                    if not is_load_saved_data:
+                        with tqdm.tqdm(total=len(train_dataloader)) as tbar:
                             hooks.clean_features()
-                            tbar.update(1)
+                            for input, label in train_dataloader:
+                                input = input.to(device)
+                                output = model(input)
+                                labels = label if labels == None else torch.cat((labels, label))
+                                for i, feature_map in enumerate(hooks.features):
+                                    if layers_names[i] in feature_maps:
+                                        feature_maps[layers_names[i]] = torch.cat((feature_maps[layers_names[i]],feature_map), dim=0)
+                                    else:
+                                        feature_maps[layers_names[i]] = feature_map
+
+                                tbar.update(1)
+                                hooks.clean_features()
+
 
                     
-
                     for layers_name in feature_maps.keys():
-                        if not os.path.exists(os.path.join(dataset_path,"CAVs")):
-                            os.makedirs(os.path.join(os.path.join(dataset_path,"CAVs")))
-                        if not os.path.exists(os.path.join(dataset_path,"Tree-based-CAVs")):
-                            os.makedirs(os.path.join(os.path.join(dataset_path,"Tree-based-CAVs")))
+                        concepts_path = os.path.join(dataset_path,"concepts_represent")
+                        if not os.path.exists(os.path.join(concepts_path,"CAVs")):
+                            os.makedirs(os.path.join(os.path.join(concepts_path,"CAVs")))
+                        if not os.path.exists(os.path.join(concepts_path,"Tree-based-CAVs")):
+                            os.makedirs(os.path.join(os.path.join(concepts_path,"Tree-based-CAVs")))
+                        if not os.path.exists(os.path.join(concepts_path,"ConceptSHAP")):
+                            os.makedirs(os.path.join(concepts_path,"ConceptSHAP"))
                         
-                        cav = CAV(concept_name, layers_name, {"model_type":'linear',"alpha":0.01}, save_path=os.path.join(dataset_path,"CAVs",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}.txt"))
+                        if not is_load_saved_data:
+                            features_path = os.path.join(dataset_path, f"{dataset_name}_{model_name}_features")
+                            if not os.path.exists(features_path):
+                                os.makedirs(features_path) 
+
+                            with open(os.path.join(features_path, f"{concept_name}_{num_samples}_{layers_name}.txt"), "wb") as fp:  
+                                pickle.dump((feature_maps[layers_name], labels), fp)
+                            # torch.save(feature_maps[layers_name], os.path.join(features_path, f"{concept_name}_{num_samples}_{layers_name}.pt"))
+                            print(f"save {dataset_name} {model_name} {concept_name} {num_samples} {layers_name} {feature_maps[layers_name].shape}")
+                        else:
+                            features_path = os.path.join(dataset_path, f"{dataset_name}_{model_name}_features")
+                            with open(os.path.join(features_path, f"{concept_name}_{num_samples}_{layers_name}.txt"), "rb") as fp:  
+                                feature_maps[layers_name], labels = pickle.load(fp)
+                        # featuremap_dataset = FeatureMapsDataset(feature_maps[layers_name], labels)
+                        
+                        
+                        cav = CAV(concept_name, layers_name, {"model_type":'linear',"alpha":0.01}, save_path=os.path.join(concepts_path,"CAVs",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}_{num_samples}.txt"))
                         cav.train(feature_maps[layers_name],labels)
 
-                        treecav = TREECAV(concept_name, layers_name, {"model_type":'decisiontree'}, save_path=os.path.join(dataset_path,"Tree-based-CAVs",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}.txt"))
+                        treecav = TREECAV(concept_name, layers_name, {"model_type":'decisiontree'}, save_path=os.path.join(concepts_path,"Tree-based-CAVs",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}_{num_samples}.txt"))
                         treecav.train(feature_maps[layers_name],labels)
+                        
+                        conceptshap = SimplifiedConceptSHAP(n_concepts= len(set(labels.numpy().tolist())), train_embeddings=feature_maps[layers_name], original_model=model, bottleneck=layers_name, example_input_for_original_model=train_dataloader.dataset[0][0], save_path=os.path.join(concepts_path,"ConceptSHAP",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}_{num_samples}.txt"), concept = concept_name)
+                        conceptshap.train(feature_maps[layers_name],labels)
 
+                        
 
-
-                        features_path = os.path.join(dataset_path, f"{dataset_name}_{model_name}_features")
-                        if not os.path.exists(features_path):
-                            os.makedirs(features_path) 
-                        torch.save(feature_maps[layers_name], os.path.join(features_path, f"{concept_name}_{num_samples}_{layers_name}.pt"))
-                        print(f"save {dataset_name} {model_name} {concept_name} {num_samples} {layers_name} {feature_maps[layers_name].shape}")
-
-                        featuremap_dataset = FeatureMapsDataset(feature_maps[layers_name], labels)
+                        
 
 
 

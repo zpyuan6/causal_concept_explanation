@@ -9,22 +9,22 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 class TREECAV(object):
-    """CAV class contains methods for concept activation vector (CAV).
+    """TREECAV class contains methods for concept activation vector (TREECAV).
 
-    CAV represents semenatically meaningful vector directions in
+    TREECAV represents semenatically meaningful vector directions in
     network's embeddings (bottlenecks).
     """
     def __init__(self, concepts, bottleneck, hparams, save_path=None):
-        """Initialize CAV class.
+        """Initialize TREECAV class.
 
         Args:
-          concepts: set of concepts used for CAV
-          bottleneck: the bottleneck used for CAV
-          hparams: a parameter used to learn CAV
+          concepts: set of concepts used for TREECAV
+          bottleneck: the bottleneck used for TREECAV
+          hparams: a parameter used to learn TREECAV
             {
                 model_type:''
             }
-          save_path: where to save this CAV
+          save_path: where to save this TREECAV
         """
         self.concepts = concepts
         self.bottleneck = bottleneck
@@ -32,7 +32,7 @@ class TREECAV(object):
         self.save_path = save_path
 
     def train(self, x, label):
-        """Train the CAVs from the activations.
+        """Train the TREECAVs from the activations.
 
         Args:
           acts: is a dictionary of activations. In particular, acts takes for of
@@ -57,9 +57,9 @@ class TREECAV(object):
         self._save_cavs()
 
     def _train_lm(self, lm, x:torch.tensor, y:torch.tensor):
-        """Train a model to get CAVs.
+        """Train a model to get TREECAVs.
 
-        Modifies lm by calling the lm.fit functions. The cav coefficients are then
+        Modifies lm by calling the lm.fit functions. The TREECAVs coefficients are then
         in lm._coefs.
 
         Args:
@@ -70,7 +70,7 @@ class TREECAV(object):
           labels2text: Dictionary of text for each label.
 
         Returns:
-          Dictionary of accuracies of the CAVs.
+          Dictionary of accuracies of the TREECAVs.
 
         """
         # x = []
@@ -108,7 +108,7 @@ class TREECAV(object):
         return acc
 
     def _save_cavs(self):
-        """Save a dictionary of this CAV to a pickle."""
+        """Save a dictionary of this TREECAVs to a pickle."""
         save_dict = {
             'concepts': self.concepts,
             'bottleneck': self.bottleneck,

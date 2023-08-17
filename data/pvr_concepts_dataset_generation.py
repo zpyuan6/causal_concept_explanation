@@ -35,10 +35,10 @@ class PVRConceptDataset(data.Dataset):
 
 class FeatureMapsDataset(data.Dataset):
     def __init__(self, x:torch.tensor, y:torch.tensor) -> None:
-        self.x = torch.reshape(x, (x.shape[0],-1))
+        self.x = x
         self.y = y
 
-        print(f"feature maps dataset {self.x.shape} {self.y.shape}")
+        # print(f"feature maps dataset {self.x.shape} {self.y.shape}")
 
     def __getitem__(self, index):
         return  self.x[index], self.y[index]
