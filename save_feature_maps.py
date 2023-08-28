@@ -19,7 +19,9 @@ class ModelHook():
 
     def hook(self, module, input, output):
         # print(input)
-        self.features.append(input[0].cpu().clone().detach())
+        # self.features.append(input[0].cpu().clone().detach())
+        self.features.append(output.cpu().clone().detach())
+        # print(output.shape)
 
     def register_hook(self,model:nn.Module,layer_name:str, module:nn.Module=None):
         if module ==None:
@@ -28,7 +30,7 @@ class ModelHook():
             hook = module.register_forward_hook(self.hook)
         self.hooks.append(hook)
 
-    def remove_hook(self):
+    def remove_hooks(self):
         for hook in self.hooks:
             hook.remove()
         self.features = []

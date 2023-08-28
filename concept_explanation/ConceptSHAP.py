@@ -7,6 +7,8 @@ import math
 from itertools import chain, combinations
 from tqdm import tqdm
 from data.pvr_concepts_dataset_generation import FeatureMapsDataset
+from model.pytorchtools import EarlyStopping
+import os
 
 
 class ConceptNet(nn.Module):
@@ -20,7 +22,6 @@ class ConceptNet(nn.Module):
         self.train_embeddings = train_embeddings.transpose(0, 1) # (dim, all_data_size)
 
         self.original_model = original_model
-        is_found_layer = False
         self.bottleneck = bottleneck
         for name,module in self.original_model.named_modules():
         #     if is_found_layer:
@@ -183,8 +184,6 @@ class ConceptSHAP(object):
         self.original_model = original_model
         self.bottleneck = bottleneck
 
-        self.concepts=nn.Parameter()
-
 
     def train(self, x, y):
         dataset = FeatureMapsDataset(x,y)
@@ -258,9 +257,12 @@ class SimplifiedConceptModel(nn.Module):
         proj = a @ (self.concept.T @ train_embedding.T) # (embedding_dim x embedding_dim) (embedding_dim x batch_size)
 
         # passing projected activations through rest of model
+
+        
         self.modified_feature_map = torch.reshape(proj.T, origninal_embedding.shape) 
         y_pred = self.original_model(self.original_model_input_sample)
         self.modified_feature_map = origninal_embedding
+
         orig_pred = self.original_model(self.original_model_input_sample)
         orig_pred = torch.argmax(orig_pred, dim=1)
 
@@ -283,11 +285,11 @@ class SimplifiedConceptSHAP(object):
         super(SimplifiedConceptSHAP, self).__init__()
         # random init using uniform dist
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.concept_model = SimplifiedConceptModel(n_concepts, train_embeddings, original_model, bottleneck, example_input_for_original_model, self.device)
+        self.concept_model = SimplifiedConceptModel(n_concepts, train_embeddings, original_model.eval(), bottleneck, example_input_for_original_model, self.device)
         self.ce_loss = nn.CrossEntropyLoss()
         self.save_path = save_path
         self.batch_size = 5
-        self.num_epoch = 5
+        self.num_epoch = 100
         self.optimizer = torch.optim.Adam(self.concept_model.parameters(),lr=1e-3)
         self.concept = concept
         
@@ -296,7 +298,7 @@ class SimplifiedConceptSHAP(object):
         concept_pred, y_pred, orig_pred = self.concept_model(train_embedding)
         loss_new = self.ce_loss(concept_pred, concept_true) + self.ce_loss(y_pred, orig_pred)
 
-        return loss_new
+        return loss_new, concept_pred
 
 
     def train(self, x, y):
@@ -304,40 +306,52 @@ class SimplifiedConceptSHAP(object):
         train_dataset,val_dataset = random_split(dataset, [int(len(dataset)*0.8),len(dataset)-int(len(dataset)*0.8)])
         train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=self.batch_size, num_workers=6, pin_memory = True, prefetch_factor=self.batch_size*2)
         val_dataloader = DataLoader(val_dataset, shuffle=False, batch_size=self.batch_size, num_workers=6, pin_memory = True, prefetch_factor=self.batch_size*2)
+        earlystop = EarlyStopping(patience=5, path=".".join(self.save_path.split(".")[:-1])+".pt")
 
-        self.concept_model = self.concept_model.to(self.device)
+        self.concept_model = self.concept_model.train().to(self.device)
         for epoch_index in range(self.num_epoch):
             with tqdm(total=len(train_dataloader)) as tbar:
                 for train_embeddings_narrow, train_concept_true_narrow in train_dataloader:
                     train_embeddings_narrow = train_embeddings_narrow.to(self.device)
                     train_concept_true_narrow = train_concept_true_narrow.to(self.device)
-                    final_loss = self.loss(train_embeddings_narrow, train_concept_true_narrow)
+                    final_loss,_ = self.loss(train_embeddings_narrow, train_concept_true_narrow)
 
                     self.optimizer.zero_grad()
                     final_loss.backward()
                     self.optimizer.step()
                     tbar.update(1)
 
-        correct_num = 0
-        number_samples = len(val_dataloader.dataset)
-        with tqdm(total=len(val_dataloader)) as tbar:
-            for val_embeddings_narrow, val_y_true_narrow in val_dataloader:
-                val_embeddings_narrow = val_embeddings_narrow.to(self.device)
-                val_y_true_narrow = val_y_true_narrow.to(self.device)
-                concept_pred, y_pred, orig_pred = self.concept_model(val_embeddings_narrow)
-                
-                correct_num += torch.eq(torch.argmax(concept_pred,dim=1),val_y_true_narrow).sum().float().cpu().item()
-                tbar.update(1)
-        
-        self.acc = correct_num/number_samples
-        print(f"Acc {self.acc}")
+            correct_num = 0
+            number_samples = len(val_dataloader.dataset)
+            all_loss = 0 
+            with tqdm(total=len(val_dataloader)) as tbar:
+                for val_embeddings_narrow, val_y_true_narrow in val_dataloader:
+                    val_embeddings_narrow = val_embeddings_narrow.to(self.device)
+                    val_y_true_narrow = val_y_true_narrow.to(self.device)
+                    l, concept_pred=self.loss(val_embeddings_narrow, val_y_true_narrow)
+
+                    all_loss += l
+                    
+                    correct_num += torch.eq(torch.argmax(concept_pred,dim=1),val_y_true_narrow).sum().float().cpu().item()
+                    tbar.update(1)
+            
+            self.acc = correct_num/number_samples
+
+            earlystop(all_loss/number_samples, self.acc, self.concept_model)
+
+            if earlystop.early_stop:
+                print("Early stopping")
+                break
+
+        print(f"Acc {earlystop.acc}")
+        self.earlystop = earlystop
         self.save_model()
         self.concept_model.remove_hook()
 
     def save_model(self):
         save_dict = {
             'concepts': self.concept,
-            'accuracies': self.acc,
+            'accuracies': self.earlystop.acc,
             'saved_path': self.save_path
         }
         if self.save_path is not None:

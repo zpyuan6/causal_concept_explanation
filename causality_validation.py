@@ -94,8 +94,6 @@ if __name__ == "__main__":
     concept_b = torch.load("concept_models\\part_classifier_mobilenet_best.pt")
     concept_d = torch.load("concept_models\\material_classifier_mobilenet_best.pt")
 
-
-
     _, val_dataloader, input_shape = load_concept_data(model_name=explained_model_name, layer_name="classifier", concept="material", batch_size=1, device=torch.device("cuda"))
 
     do_calculus(explained_model_name, val_dataloader, concept_d, 4, 5, 4)
