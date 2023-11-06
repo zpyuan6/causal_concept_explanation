@@ -36,18 +36,21 @@ def load_dataset(dataset_path, dataset_name, concept_name, num_samples, batch_si
 # def train_concept_represent_svm(input_features, concept_labels):
 #   
 
-
-
-if __name__ == "__main__":
+def concept_represententation_identify():
     batch_size = 10
     CONCEPT_LIST = ['TOP_LEFT','TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT', 'IS_ZERO', 'IS_ONE', 'IS_TWO', 'IS_THREE', 'IS_FOUR','IS_FIVE','IS_SIX', 'IS_SEVEN', 'IS_EIGHT','IS_NINE']
+    # CONCEPT_LIST = ['BOTTOM_RIGHT', 'IS_ZERO', 'IS_ONE', 'IS_TWO', 'IS_THREE', 'IS_FOUR','IS_FIVE','IS_SIX', 'IS_SEVEN', 'IS_EIGHT','IS_NINE']
+    # CONCEPT_LIST = ['IS_EIGHT','IS_NINE']
     NUM_SAMPLE_LIST = [10,20,40,80,160]
 
     DATASET_NAMES = ['mnist','cifar']
+    # DATASET_NAMES = ['mnist']
+    # DATASET_NAMES = ['cifar']
     dataset_path = "F:\\pvr_dataset"
 
-    MODEL_NAMES= ['vgg','resnet','mobilenet','densenet']
-    # MODEL_NAMES= ['densenet']
+    # MODEL_NAMES= ['vgg','resnet','mobilenet','densenet']
+    # MODEL_NAMES= ['resnet']
+    MODEL_NAMES= ['mobilenet','densenet']
 
     is_load_saved_data = True
 
@@ -72,6 +75,8 @@ if __name__ == "__main__":
                                 hooks.register_hook(model, name,module)
                     elif model_name=="resnet":
                         layers_names = ["maxpool","layer1","layer2","layer3","layer4","avgpool"]
+                        # layers_names = ["layer1","layer2","layer3","layer4","avgpool"]
+                        # layers_names = ["maxpool"]
                         for name in layers_names:
                             hooks.register_hook(model, name)
                     elif model_name == "mobilenet":
@@ -110,7 +115,6 @@ if __name__ == "__main__":
 
                     hooks.remove_hooks()
 
-                    # print("!!!!!!!!!!!!!", feature_maps.keys())
                     for layers_name in layers_names:
                         concepts_path = os.path.join(dataset_path,"concepts_represent")
                         if not os.path.exists(os.path.join(concepts_path,"CAVs")):
@@ -147,6 +151,7 @@ if __name__ == "__main__":
                         # treecav.train(feature_maps[layers_name],labels)
                         
                         conceptshap = SimplifiedConceptSHAP(n_concepts= len(set(labels.numpy().tolist())), train_embeddings=feature_maps[layers_name], original_model=model, bottleneck=layers_name, example_input_for_original_model=train_dataloader.dataset[0][0], save_path=os.path.join(concepts_path,"ConceptSHAP",f"{dataset_name}_{model_name}_{layers_name}_{concept_name}_{num_samples}.txt"), concept = concept_name)
+
                         conceptshap.train(feature_maps[layers_name],labels)
 
                         # concept_represent = ConceptBasedCausalVariable(
@@ -168,6 +173,32 @@ if __name__ == "__main__":
                         #     save_path=os.path.join(concepts_path,"CausalVariables", f"{dataset_name}_{model_name}_{layers_name}_{concept_name}_{num_samples}.txt")
                         #     )
                         # concept_represent.train(feature_maps[layers_name],labels)
+
+def present_and_save_accurate_path(path):
+
+    concept_dict = {}
+
+    for root, folders, files in os.walk(path):
+        for file in files:
+            if file.split(".")[-1] == 'txt':
+                print(f"----------------\nDataset: {file.split('_')[0]};\nModel: {file.split('_')[1]};\nLayer: {file.split('_')[2]};\nConcept: {'_'.join(file.split('_')[3:-1])};\nLength: {file.split('_')[-1]}")
+
+                with open(os.path.join(root, file), 'rb') as pkl_file:
+                    results = pickle.load(pkl_file)
+                    print(results['concepts'], results['bottleneck'], results['accuracies']['overall'])
+
+            elif file.split(".")[-1] == 'pt':
+                print('pt:',file)
+                torch_value = torch.load(os.path.join(root, files))
+                print(torch_value)
+
+
+
+if __name__ == "__main__":
+    # concept_represententation_identify()
+
+    path = "F:\\pvr_dataset\\concepts_represent\\CAVs"
+    present_and_save_accurate_path(path)
                         
                         
 
