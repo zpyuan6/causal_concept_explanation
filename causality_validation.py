@@ -83,7 +83,6 @@ def do_calculus(explained_model_name, val_dataloader, concept_model_a, concep_in
         
 # def necessity(concept_a, concept_b, dataset_train, dataset_val):
 
-
 # def sufficiency(concept_a, concept_b, dataset_train, dataset_val):
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 import matplotlib.pylab as plt
 
-class PVRDataset(Dataset):
+class CausalPVRDataset(Dataset):
     """Face Landmarks dataset."""
 
     def __init__(self, dataset_path:str, dataset_name:str, train_or_val:str, num_class:int):
@@ -38,7 +38,7 @@ class PVRDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
+        return self.x[idx], self.y[idx][-1], self.y[idx]
 
 
 if __name__=="__main__":

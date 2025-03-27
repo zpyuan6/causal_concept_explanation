@@ -2,15 +2,15 @@ import torch
 import wandb
 import os
 from model.model_training import load_model, train_model, val_model
-from data.PVRDataset import PVRDataset
+from data.PVRDataset import CausalPVRDataset
 from model.pytorchtools import EarlyStopping
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
 def load_dataset(dataset_path, dataset_name, num_class, batch_size):
-    train_dataset = PVRDataset(dataset_path, dataset_name, "train", num_class)
-    val_dataset = PVRDataset(dataset_path, dataset_name, "val", num_class)
+    train_dataset = CausalPVRDataset(dataset_path, dataset_name, "train", num_class)
+    val_dataset = CausalPVRDataset(dataset_path, dataset_name, "val", num_class)
     print(f"train dataset {len(train_dataset)}, val dataset {len(val_dataset)}")
 
     train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=batch_size, num_workers=6, pin_memory = True, prefetch_factor=batch_size*2)
@@ -44,7 +44,7 @@ def train_pvr(dataset_folder,dataset_name):
 
         train_dataloader, val_dataloader = load_dataset(dataset_folder, dataset_name, num_class, batch_size)
 
-        model_save_path = f"model/logs/{model_name}.pt"
+        model_save_path = os.path.join(dataset_folder,f"{model_name}.pt")
         early_stopping = EarlyStopping(patience=50, verbose=True, path=model_save_path)
 
         optimizer = optim.AdamW(model.parameters(), learn_rate)
@@ -69,7 +69,7 @@ def train_pvr(dataset_folder,dataset_name):
 
             if acc > best_acc:
                 best_acc = acc
-                torch.save(model.state_dict(), f"{model_name}_{dataset_name}_best.pt")
+                torch.save(model.state_dict(), os.path.join(dataset_folder, f"{model_name}_best.pt") )
 
             if early_stopping.early_stop:
                 print("Early stopping")
@@ -78,7 +78,13 @@ def train_pvr(dataset_folder,dataset_name):
 if __name__ == "__main__":
 
     # train_pvr(dataset_folder = "F:\pvr_dataset\mnist_pvr", dataset_name = "mnist")
-    train_pvr(dataset_folder = "F:\pvr_dataset\cifar_pvr", dataset_name = "cifar")
+    # train_pvr(dataset_folder = "F:\pvr_dataset\cifar_pvr", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\random_chain", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\limited_random_chain", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\random_collider", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\limited_random_collider", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\random_fork", dataset_name = "cifar")
+    train_pvr(dataset_folder = "F:\\pvr_dataset\\causal_validation_pvr\\limited_random_fork", dataset_name = "cifar")
     
 
     

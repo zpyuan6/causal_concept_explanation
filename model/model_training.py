@@ -25,7 +25,7 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     correct = 0
     with tqdm.tqdm(total= step_num) as tbar:
         if prefetcher is None:
-            for data, target in train_datasetloader:
+            for data, target, _ in train_datasetloader:
                 # if epoch==0 and num==0:
                 #     images = wandb.Image(
                 #         data[0].squeeze(0),
@@ -101,7 +101,7 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
     with torch.no_grad():
         with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
             if prefetcher is None:
-                for data, target in val_datasetloader:
+                for data, target, _ in val_datasetloader:
                     data, target = data.to(device), target.to(device)
 
                     # print(target[0], torch.max(data[0]), torch.min(data[0]))
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         print("Start {} model training".format(model_name))
 
         model = load_model(model_name)
-        
+
         model.to(device)
 
         train_dataloader, val_dataloader = load_dataset(dataset_folder, input_size, batch_size)
@@ -237,7 +237,7 @@ if __name__ == "__main__":
         loss_function = nn.CrossEntropyLoss(weight=torch.Tensor(sample_nums).to(device))
 
         best_acc = 0
-        
+
         for epoch in range(NUM_EPOCHES):
             train_loss = train_model(model, loss_function, optimizer, device, NUM_EPOCHES, epoch, train_dataloader)
             avgloss, correct, acc = val_model(model, device, loss_function, val_dataloader)
