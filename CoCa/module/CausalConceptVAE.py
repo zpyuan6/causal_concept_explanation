@@ -21,6 +21,8 @@ class CausalConceptVAE(nn.Module):
             input_shape, concept_dims, concept_remove_y = self.load_from_pth(model_file_path)
         
         self.concept_dims = concept_dims
+        if concept_remove_y:
+            self.concept_dims = self.concept_dims[:-1]
         self.concept_remove_y = concept_remove_y
         self.kld_weight = kld_weight
 
@@ -101,6 +103,7 @@ class CausalConceptVAE(nn.Module):
                         ),
                 nn.BatchNorm1d(2*concept_dim),
                 nn.LeakyReLU(),
+
                     nn.Linear(
                         2*concept_dim,
                         int(self.input_shape[0]/4+3*concept_dim/2)
@@ -137,17 +140,17 @@ class CausalConceptVAE(nn.Module):
                     nn.LeakyReLU()
                 ) for concept_dim in self.concept_dims])
 
-        # if concept_remove_y:
-        #     self.decoder_layer_wise_layer = nn.Sequential(
-        #             nn.Linear(num_concepts+1, num_concepts+1),
-        #             nn.LeakyReLU(),
-        #             nn.Linear(num_concepts+1, self.input_shape[1]),
-        #             nn.LeakyReLU(),
-        #             nn.Linear(self.input_shape[1], self.input_shape[1]),
-        #             nn.Tanh()
-        #         )
-        # else:
-        self.decoder_layer_wise_layer = nn.Sequential(
+        if concept_remove_y:
+            self.decoder_layer_wise_layer = nn.Sequential(
+                    nn.Linear(num_concepts+1, num_concepts+1),
+                    nn.LeakyReLU(),
+                    nn.Linear(num_concepts+1, self.input_shape[1]),
+                    nn.LeakyReLU(),
+                    nn.Linear(self.input_shape[1], self.input_shape[1]),
+                    nn.Tanh()
+                )
+        else:
+            self.decoder_layer_wise_layer = nn.Sequential(
                     nn.Linear(num_concepts, num_concepts),
                     nn.LeakyReLU(),
                     nn.Linear(num_concepts, self.input_shape[1]),
