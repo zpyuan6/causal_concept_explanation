@@ -83,21 +83,14 @@ def get_causal_effect_matrix(path):
                     
             print(causal_effect_matrix)
 
-                # target_concept = causal_effect_matrix[i]
+        for i in range(causal_effect_matrix.shape[0]):
+            causal_effect_matrix[i] /= number_treated_samples[i]
 
-                # concept_layer_location = concept_locations[i]
-                
-                # concept_label_for_concept_i = concept_label[:, i]
-
-                # operator_concept_value = torch.ones((x.shape[0], concept_dim))
-
-                # operator_concept_value[concept_label_for_concept_i] = 0
-                
-                # concept_operat_value = []
-
-                # do_calculate_samples = {f"concept_{i}": concept_label_for_concept_i for i in range(len(concept_label_for_concept))}
+        final_causal_effect_matrix = causal_effect_matrix.cpu().detach().numpy()
+        
+        return final_causal_effect_matrix
 
 if __name__ == "__main__":
-    # visualise_causal_adjacency_matrix_in_VAE_probe("F:\\causal_pvr_v2\\collider")
+    visualise_causal_adjacency_matrix_in_VAE_probe("F:\\causal_pvr_v2\\collider")
 
-    get_causal_effect_matrix("F:\\causal_pvr_v2\\collider")
+    # get_causal_effect_matrix("F:\\causal_pvr_v2\\collider")

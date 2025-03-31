@@ -8,7 +8,7 @@ import matplotlib.pylab as plt
 class NeuronalAbstractionDataset(Dataset):
     """Face Landmarks dataset."""
 
-    def __init__(self, dataset_path:str, model_name:str, train_or_val:str):
+    def __init__(self, dataset_path:str, model_name:str, train_or_val:str, concept_remove_y:bool=False):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -24,6 +24,8 @@ class NeuronalAbstractionDataset(Dataset):
 
         self.y = torch.from_numpy(data_output_file).to(torch.int64)
 
+        self.concept_remove_y = concept_remove_y
+
         print(f"Load Neuronal Abstraction Dataset {self.x.shape}, {self.y.shape}")
 
     def get_input_shape(self):
@@ -36,4 +38,7 @@ class NeuronalAbstractionDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx][-1], self.y[idx]
+        if self.concept_remove_y:
+            return self.x[idx], self.y[idx][-1], self.y[idx][:-1]
+        else:
+            return self.x[idx], self.y[idx][-1], self.y[idx]

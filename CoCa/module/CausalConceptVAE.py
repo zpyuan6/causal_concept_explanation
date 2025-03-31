@@ -13,13 +13,15 @@ class CausalConceptVAE(nn.Module):
                  kld_weight: int = 1,
                  classify_weight: int = 1,
                  model_file_path: str = None,
+                 concept_remove_y: bool = False,
                  **kwargs) -> None:
         super(CausalConceptVAE, self).__init__()
 
         if model_file_path is not None:
-            input_shape, concept_dims = self.load_from_pth(model_file_path)
-
+            input_shape, concept_dims, concept_remove_y = self.load_from_pth(model_file_path)
+        
         self.concept_dims = concept_dims
+        self.concept_remove_y = concept_remove_y
         self.kld_weight = kld_weight
 
         # input_shape = [neuronal abstraction width, number of layers]
@@ -83,7 +85,10 @@ class CausalConceptVAE(nn.Module):
             mask = torch.load(model_file_path)['causal_adjacency_mask'].cpu()
             print(f'Load causal_adjacency_mask: \n', mask)
         else:
-            mask = (torch.ones(len(self.concept_dims), len(self.concept_dims)) - torch.eye(len(self.concept_dims)))
+            if self.concept_remove_y:
+                mask = torch.ones(len(self.concept_dims)+1, len(self.concept_dims)+1) - torch.eye(len(self.concept_dims)+1)
+            else:
+                mask = (torch.ones(len(self.concept_dims), len(self.concept_dims)) - torch.eye(len(self.concept_dims)))
         
         self.causal_adjacency_mask = nn.Parameter(mask, requires_grad=False)
 
@@ -96,7 +101,6 @@ class CausalConceptVAE(nn.Module):
                         ),
                 nn.BatchNorm1d(2*concept_dim),
                 nn.LeakyReLU(),
-
                     nn.Linear(
                         2*concept_dim,
                         int(self.input_shape[0]/4+3*concept_dim/2)
@@ -133,6 +137,16 @@ class CausalConceptVAE(nn.Module):
                     nn.LeakyReLU()
                 ) for concept_dim in self.concept_dims])
 
+        # if concept_remove_y:
+        #     self.decoder_layer_wise_layer = nn.Sequential(
+        #             nn.Linear(num_concepts+1, num_concepts+1),
+        #             nn.LeakyReLU(),
+        #             nn.Linear(num_concepts+1, self.input_shape[1]),
+        #             nn.LeakyReLU(),
+        #             nn.Linear(self.input_shape[1], self.input_shape[1]),
+        #             nn.Tanh()
+        #         )
+        # else:
         self.decoder_layer_wise_layer = nn.Sequential(
                     nn.Linear(num_concepts, num_concepts),
                     nn.LeakyReLU(),
@@ -173,7 +187,7 @@ class CausalConceptVAE(nn.Module):
 
         return [mu, log_var, concept_classes]
 
-    def decode(self, z: Tensor, concept_classes: list) -> Tensor:
+    def decode(self, z: Tensor, concept_classes: list, input_tensor: Tensor=None) -> Tensor:
         """
         Maps the given latent codes
         onto the image space.
@@ -186,13 +200,17 @@ class CausalConceptVAE(nn.Module):
             latent_input = torch.cat([concept_classes[index], z[index]], dim = -1) 
             concept_feature = decoder_linear(latent_input)
             concept_features.append(concept_feature)
+        
+        num_concept = len(concept_features)
+        if self.concept_remove_y:
+            concept_features.append(input_tensor[:,:, -1])
+            num_concept += 1
 
         if self.training:
-            num_concept = len(concept_features)
             mask_index = random.randint(0, num_concept-1)
             concept_features[mask_index] = concept_features[mask_index] * 0.0
 
-        concept_features = torch.stack(concept_features, dim = -1) # [B x num_concept x concept_dim]
+        concept_features = torch.stack(concept_features, dim = -1)
 
         result = self.decoder_layer_wise_layer(concept_features)
 
@@ -216,7 +234,7 @@ class CausalConceptVAE(nn.Module):
         mu, log_var, concept_classes = self.encode(input)
         z = [self.reparameterize(mu[i], log_var[i]) for i in range(len(self.concept_dims))]
         concept_classes = [F.softmax(concept_class, dim = -1) for concept_class in concept_classes]
-        return  [self.decode(z, concept_classes), input, mu, log_var, concept_classes]
+        return  [self.decode(z, concept_classes, input), input, mu, log_var, concept_classes]
 
     def loss_function(
                     self,
@@ -260,22 +278,22 @@ class CausalConceptVAE(nn.Module):
         loss = recons_loss + self.kld_weight * kld_loss + self.classify_weight * classify_loss
         return {'loss': loss, 'Reconstruction_Loss': self.kld_weight * recons_loss.detach(), 'KLD': kld_loss.detach(), 'Classify_Loss': self.classify_weight * classify_loss.detach()}
 
-    def sample(
-        self,
-        z:  Tensor,
-        concept_one_hot: Tensor,
-        current_device: int, **kwargs) -> Tensor:
-        """
-        Samples from the latent space and return the corresponding
-        image space map.
-        :param num_samples: (Int) Number of samples
-        :param current_device: (Int) Device to run the model
-        :return: (Tensor)
-        """
-        z = z.to(current_device)
-        concept_one_hot = [one_hot.to(current_device) for one_hot in concept_one_hot]
-        samples = self.decode(z, concept_one_hot)
-        return samples
+    # def sample(
+    #     self,
+    #     z:  Tensor,
+    #     concept_one_hot: Tensor,
+    #     current_device: int, **kwargs) -> Tensor:
+    #     """
+    #     Samples from the latent space and return the corresponding
+    #     image space map.
+    #     :param num_samples: (Int) Number of samples
+    #     :param current_device: (Int) Device to run the model
+    #     :return: (Tensor)
+    #     """
+    #     z = z.to(current_device)
+    #     concept_one_hot = [one_hot.to(current_device) for one_hot in concept_one_hot]
+    #     samples = self.decode(z, concept_one_hot)
+    #     return samples
 
     def generate(self, x: Tensor, **kwargs) -> Tensor:
 
@@ -312,6 +330,9 @@ class CausalConceptVAE(nn.Module):
             concept_representations_for_each_concept_value.append(concept_connectivity)
             concept_representations_for_each_concept.append(torch.sum(concept_connectivity, dim=0))
 
+        if self.concept_remove_y:
+            concept_locations = torch.cat([concept_locations, torch.tensor([self.input_shape[1]-1]).to(concept_locations.device)], dim=0)
+
         return concept_locations, concept_representations_for_each_concept, concept_representations_for_each_concept_value
 
 
@@ -327,8 +348,10 @@ class CausalConceptVAE(nn.Module):
         encoder_connectivity = (self.encoder_layer_wise_layer[0].weight**2).T
         max_indices = torch.argmax(encoder_connectivity, dim=0)
 
+        if self.concept_remove_y:
+            max_indices = torch.cat([max_indices, torch.tensor([self.input_shape[1]-1]).to(max_indices.device)], dim=0)
+
         # # adjacency_matrix is defined as the product of the weights of the layer_wise_layer in decoder
-        # max_indices = torch.argmax(self.encoder_layer_wise_layer[2].weight**2, dim=1)
 
         connectivity =  (self.decoder_layer_wise_layer[0].weight**2).T @ (self.decoder_layer_wise_layer[2].weight**2).T @ (self.decoder_layer_wise_layer[4].weight**2).T
         adjacency_matrix = connectivity[:, max_indices]
@@ -365,5 +388,9 @@ class CausalConceptVAE(nn.Module):
         for concept_index in range(concept_num):
             concept_dims.append(parameter[f'encoder_grouped_linear_concept_classifer.{concept_index}.0.weight'].shape[0])
 
-        return input_shape, concept_dims
+        concept_remove_y = (concept_num != parameter['decoder_layer_wise_layer.0.weight'].shape[0])
+        if concept_remove_y:
+            concept_dims.append(parameter['encoder_grouped_linear_concept_classifer.0.0.weight'].shape[0])
+
+        return input_shape, concept_dims, concept_remove_y
 

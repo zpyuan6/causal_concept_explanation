@@ -17,12 +17,13 @@ def optimise_global_VAE_probe(path):
 
     for name in model_name:
 
-        training_data = NeuronalAbstractionDataset(path, name, "train")
-        test_data = NeuronalAbstractionDataset(path, name, "test")
+        training_data = NeuronalAbstractionDataset(path, name, "train", concept_remove_y=True)
+        test_data = NeuronalAbstractionDataset(path, name, "test", concept_remove_y=True)
 
         probe = CausalConceptVAE(
             input_shape=training_data.get_input_shape(),
-            concept_dims=training_data.get_concept_dims()-1
+            concept_dims=training_data.get_concept_dims(),
+            concept_remove_y=True
         )
 
         dataset_name = path.split('\\')[-1]
