@@ -8,7 +8,7 @@ import matplotlib.pylab as plt
 class CausalPVRDataset(Dataset):
     """Face Landmarks dataset."""
 
-    def __init__(self, dataset_path:str, dataset_name:str, train_or_val:str, num_class:int):
+    def __init__(self, dataset_path:str, train_or_val:str):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -16,21 +16,19 @@ class CausalPVRDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        if dataset_name not in ["mnist", "cifar"]:
-            raise Exception(f"Can not find dataset {dataset_name}.")
 
-        file = open(os.path.join(dataset_path, f"{train_or_val}_{dataset_name}_pvr.txt"),'rb')    
 
-        x, y = pickle.load(file)
+        data_input_file = np.load(os.path.join(dataset_path, f"{train_or_val}_image_casaul_pvr.npy"), allow_pickle=True).transpose(0,3,1,2)
+        data_output_file = np.load(os.path.join(dataset_path, f"{train_or_val}_concept_casaul_pvr.npy"), allow_pickle=True)
 
-        self.x = torch.from_numpy(np.array(x))/255
+        self.x = torch.from_numpy(data_input_file)/255
 
         if self.x.shape[1] != 3:
             self.x = self.x.repeat(1,3,1,1)
 
         # print(self.x.shape, torch.unsqueeze(torch.from_numpy(np.array(y)),1).dtype)
         # self.y = torch.nn.functional.one_hot(torch.unsqueeze(torch.from_numpy(np.array(y)),1).to(torch.int64) , num_class)
-        self.y = torch.from_numpy(np.array(y)).to(torch.int64)
+        self.y = torch.from_numpy(data_output_file).to(torch.int64)
 
         print(self.x.shape, self.y.shape)
         

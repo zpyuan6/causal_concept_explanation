@@ -169,6 +169,9 @@ def generate_causal_pvr_minist(dataset_path):
     np.save(os.path.join(limited_random_collider_path,"test_image_mnist_pvr.npy") ,np.array(test_x))
     np.save(os.path.join(limited_random_collider_path,"test_label_mnist_pvr.npy") ,np.array(test_y))
 
+
 if  __name__ == "__main__":
 
     generate_causal_pvr_minist("F:\\pvr_dataset\\causal_validation_pvr")
+
+

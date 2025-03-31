@@ -25,7 +25,7 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
     correct = 0
     with tqdm.tqdm(total= step_num) as tbar:
         if prefetcher is None:
-            for data, target, _ in train_datasetloader:
+            for item in train_datasetloader:
                 # if epoch==0 and num==0:
                 #     images = wandb.Image(
                 #         data[0].squeeze(0),
@@ -34,7 +34,7 @@ def train_model(model:torch.nn.Module, loss_function, optimizer, device, epoch_n
                 #     wandb.log({"Input sample":images})
 
                 #     num+=1
-                data, target = data.to(device), target.to(device)
+                data, target = item[0].to(device), item[1].to(device)
 
                 # print(target[0])
                 # img = np.transpose(np.squeeze(data[0].cpu().numpy()),(1,2,0))
@@ -101,8 +101,8 @@ def val_model(model:torch.nn.Module, device, loss_function, val_datasetloader, p
     with torch.no_grad():
         with tqdm.tqdm(total = len(val_datasetloader)) as pbar:
             if prefetcher is None:
-                for data, target, _ in val_datasetloader:
-                    data, target = data.to(device), target.to(device)
+                for item in val_datasetloader:
+                    data, target = item[0].to(device), item[1].to(device)
 
                     # print(target[0], torch.max(data[0]), torch.min(data[0]))
                     # img = np.transpose(np.squeeze(data[0].cpu().numpy()),(1,2,0))
