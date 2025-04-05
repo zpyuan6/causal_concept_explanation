@@ -4,13 +4,8 @@ from torch.nn import functional as F
 from typing import List
 from torch import Tensor
 import random
-import numpy
-from sklearn.ensemble import ExtraTreesRegressor
-from sklearn.feature_selection import SelectFromModel
-from tqdm import tqdm
 
-
-class CausalConceptVAE(nn.Module):
+class CausalConceptVAEv2(nn.Module):
 
     def __init__(self,
                  input_shape:list = None,
@@ -20,14 +15,12 @@ class CausalConceptVAE(nn.Module):
                  model_file_path: str = None,
                  concept_remove_y: bool = False,
                  **kwargs) -> None:
-        super(CausalConceptVAE, self).__init__()
+        super(CausalConceptVAEv2, self).__init__()
 
         if model_file_path is not None:
             input_shape, concept_dims, concept_remove_y = self.load_from_pth(model_file_path)
         
         self.concept_dims = concept_dims
-        if concept_remove_y:
-            self.concept_dims = self.concept_dims[:-1]
         self.concept_remove_y = concept_remove_y
         self.kld_weight = kld_weight
 
@@ -92,14 +85,16 @@ class CausalConceptVAE(nn.Module):
             mask = torch.load(model_file_path)['causal_adjacency_mask'].cpu()
             print(f'Load causal_adjacency_mask: \n', mask)
         else:
-            if self.concept_remove_y:
-                mask = torch.ones(len(self.concept_dims)+1, len(self.concept_dims)+1) - torch.eye(len(self.concept_dims)+1)
-            else:
-                mask = (torch.ones(len(self.concept_dims), len(self.concept_dims)) - torch.eye(len(self.concept_dims)))
+            mask = (torch.ones(len(self.concept_dims), len(self.concept_dims)) - torch.eye(len(self.concept_dims)))
         
         self.causal_adjacency_mask = nn.Parameter(mask, requires_grad=False)
 
         # Build Decoder
+        if concept_remove_y:
+            concept_dims = self.concept_dims[:-1]
+        else:
+            concept_dims = self.concept_dims
+
         self.decoder_grouped_linear_layer = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(
@@ -143,19 +138,10 @@ class CausalConceptVAE(nn.Module):
                         ),
                     nn.BatchNorm1d(self.input_shape[0]),
                     nn.LeakyReLU()
-                ) for concept_dim in self.concept_dims])
+                ) for concept_dim in concept_dims])
 
-        if concept_remove_y:
-            self.decoder_layer_wise_layer = nn.Sequential(
-                    nn.Linear(num_concepts+1, num_concepts+1),
-                    nn.LeakyReLU(),
-                    nn.Linear(num_concepts+1, self.input_shape[1]),
-                    nn.LeakyReLU(),
-                    nn.Linear(self.input_shape[1], self.input_shape[1]),
-                    nn.Tanh()
-                )
-        else:
-            self.decoder_layer_wise_layer = nn.Sequential(
+
+        self.decoder_layer_wise_layer = nn.Sequential(
                     nn.Linear(num_concepts, num_concepts),
                     nn.LeakyReLU(),
                     nn.Linear(num_concepts, self.input_shape[1]),
@@ -242,8 +228,7 @@ class CausalConceptVAE(nn.Module):
         mu, log_var, concept_classes = self.encode(input)
         z = [self.reparameterize(mu[i], log_var[i]) for i in range(len(self.concept_dims))]
         concept_classes = [F.softmax(concept_class, dim = -1) for concept_class in concept_classes]
-        recons = self.decode(z, concept_classes, input)
-        return  [recons, input, mu, log_var, concept_classes]
+        return  [self.decode(z, concept_classes, input), input, mu, log_var, concept_classes]
 
     def loss_function(
                     self,
@@ -339,7 +324,18 @@ class CausalConceptVAE(nn.Module):
             concept_representations_for_each_concept_value.append(concept_connectivity)
             concept_representations_for_each_concept.append(torch.sum(concept_connectivity, dim=0))
 
+        if self.concept_remove_y:
+            #  concept_locations = torch.cat([concept_locations, torch.tensor([self.input_shape[1]-1]).to(concept_locations.device)], dim=0)
+            concept_locations[-1] = torch.tensor([self.input_shape[1]-1])
+        #     concept_representations_for_each_concept.append(
+        #         torch.ones_like(concept_representations_for_each_concept_value[0])
+        #     )
+
         return concept_locations, concept_representations_for_each_concept, concept_representations_for_each_concept_value
+
+
+
+
 
 # <---------------- Causal Structure Discovery ------------------------>
 
@@ -351,7 +347,8 @@ class CausalConceptVAE(nn.Module):
         max_indices = torch.argmax(encoder_connectivity, dim=0)
 
         if self.concept_remove_y:
-            max_indices = torch.cat([max_indices, torch.tensor([self.input_shape[1]-1]).to(max_indices.device)], dim=0)
+            # max_indices = torch.cat([max_indices, torch.tensor([self.input_shape[1]-1]).to(max_indices.device)], dim=0)
+            max_indices[-1] = torch.tensor([self.input_shape[1]-1]).to(max_indices.device)
 
         # # adjacency_matrix is defined as the product of the weights of the layer_wise_layer in decoder
 
@@ -373,44 +370,6 @@ class CausalConceptVAE(nn.Module):
     def h_loss(self, adjacency_matrix: Tensor):
         return torch.trace(torch.matrix_exp(adjacency_matrix * adjacency_matrix)) - adjacency_matrix.shape[0]
 
-    def prune_causal_structure(self, all_samples, thresh=0.75):
-        """
-        Preliminary neighborhood selection
-
-        Parameters
-        ----------
-        model_adj: numpy.ndarray
-            adjacency matrix, all element is 1
-        all_samples: numpy.ndarray
-            2 dimensional array include all samples
-        num_neighbors: integer
-            variable number or neighbors number you want
-        thresh: float
-            apply for sklearn.feature_selection.SelectFromModel
-
-        Returns
-        -------
-        model_adj: numpy.ndarray
-            adjacency matrix, after pns process
-        """
-
-        num_nodes = all_samples.shape[1]
-
-        model_adj = self.get_causal_adjacency_matrix().cpu().detach().numpy()
-
-        for node in tqdm(range(num_nodes), desc='Preliminary neighborhood selection'):
-            x_other = numpy.copy(all_samples)
-            x_other[:, node] = 0
-            extra_tree = ExtraTreesRegressor(n_estimators=500)
-            extra_tree.fit(x_other, all_samples[:, node])
-            selected_reg = SelectFromModel(extra_tree,
-                                        threshold="{}*mean".format(thresh),
-                                        prefit=True,
-                                        max_features=all_samples.shape[-1])
-            mask_selected = selected_reg.get_support(indices=False)
-            model_adj[:, node] *= mask_selected
-
-        return model_adj
 
 # <---------------- Load Module ------------------------>
 

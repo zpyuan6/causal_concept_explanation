@@ -33,6 +33,9 @@ class NeuronalAbstractionDataset(Dataset):
 
     def get_concept_dims(self):
         return (torch.max(self.y, dim=0)[0] + 1).tolist()
+    
+    def get_concept_labels(self):
+        return self.y
         
     def __len__(self):
         return len(self.x)
