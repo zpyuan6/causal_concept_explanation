@@ -4,6 +4,7 @@ import os
 import pickle
 import numpy as np
 import matplotlib.pylab as plt
+import random
 
 class CausalPVRDataset(Dataset):
     """Face Landmarks dataset."""
@@ -42,22 +43,34 @@ class CausalPVRDataset(Dataset):
 if __name__=="__main__":
 
     batch_size = 1
-    dataset_path = "F:\pvr_dataset\cifar_pvr"
-    dataset_name = "cifar"
+    dataset_path = "F:\\causal_pvr_v2\\chain"
+    dataset_name = "mnist"
     num_class=10
 
-    train_dataset = PVRDataset(dataset_path, dataset_name, "train", num_class)
-    val_dataset = PVRDataset(dataset_path, dataset_name, "val", num_class)
+    # train_dataset = CausalPVRDataset(dataset_path, dataset_name, "train", num_class)
+    # val_dataset = CausalPVRDataset(dataset_path, dataset_name, "val", num_class)
 
-    x_t,y_t = train_dataset[0]
-    
-    print(y_t)
-    img = np.transpose(np.squeeze(x_t.numpy()),(1,2,0))
-    plt.imshow(img)
+    train_dataset = CausalPVRDataset(dataset_path, "train")
+    # val_dataset = CausalPVRDataset(dataset_path, dataset_name, "val", num_class)
+
+    fig, ax = plt.subplots(1, 4, figsize=(10, 3))
+
+    plt.axis('off')
+
+    for i in range(4):
+        inde = random.randint(0, len(train_dataset)-1)
+        x_t,y_t,c_t = train_dataset[inde]
+        ax[i].imshow(x_t.permute(1, 2, 0).cpu().numpy())
+
+        ax[i].set_title(f"Task label: {y_t.numpy()}")
+
+        ax[i].axis("off")
+
+
     plt.show()
 
-    x_t,y_t = val_dataset[0]
-    print(y_t)
-    img = np.transpose(np.squeeze(x_t.numpy()),(1,2,0))
-    plt.imshow(img)
-    plt.show()
+    # x_t,y_t = val_dataset[0]
+    # print(y_t)
+    # img = np.transpose(np.squeeze(x_t.numpy()),(1,2,0))
+    # plt.imshow(img)
+    # plt.show()
